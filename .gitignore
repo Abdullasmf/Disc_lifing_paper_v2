@@ -1,0 +1,82 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# Local development settings
+.env
+.venv
+
+# VS Code specific files
+.vscode/
+
+# ANSYS
+*.rst
+*.log
+*.prt
+*.wbnj
+*.project_cache
+*.lock
+*.dat
+*.wbdp
+*.wbjn
+*.wbpj
+*.xml
+*.err
+*.PCS
+*.out
+*.mntr
+*.engd
+*.scdoc
+*.mechdb
+*.engd
+*.aapresults
+*.cnd
+*.DSP
+*.gst
+*.rcn
+*.bat
+*.ldhi
+*.rdb
+*.txt
+
+*.xlsx
+*.csv
+
+# Generated dataset artifacts (regenerable outputs, not source/provenance)
+*.png
+*.jpg
+*.jpeg
+summary*
+
+
+FEM_Val/
+
+DesignPointLog.csv
+memory_reduction/
+Expressions.xls
+
+*.cdb
+
+*.h5
+*.dsco
+*.bak
+*.sha256
+
+Data_gen/output/checksums.sha256
+Data_gen/output/rim_load_validation/
+.nfs00000024804e2fd40000000e
+Data_gen/generation_steps.pdf

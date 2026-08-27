@@ -1,0 +1,86 @@
+{
+  "evaluation_label": "validation-split evaluation",
+  "representatives": [
+    {
+      "selection": "median",
+      "sample_id": "1716",
+      "true_min_loglife": 1.6730613708496094,
+      "true_min_life_cycles": 47.104388566082434,
+      "true_max_stress_mpa": 1179.3057861328125,
+      "governing_zone": "lower_transition",
+      "governing_subzone": "lower_transition",
+      "geometry_attributes": {
+        "blade_equiv_force_N": 331200.0,
+        "blade_equiv_load_description": "annular_blade_mass_centrifugal_surrogate_rim_top_ligament_arm_land_face",
+        "sample_id": "1716",
+        "seed": "20589122"
+      },
+      "ArGEnT_self_att_noSDF_signed_min_loglife_error": 0.27335262298583984,
+      "ArGEnT_self_att_noSDF_absolute_min_loglife_error": 0.27335262298583984,
+      "ArGEnT_self_att_noSDF_absolute_max_stress_error_mpa": 53.376708984375,
+      "PointNetMLPJoint_signed_min_loglife_error": 0.10526657104492188,
+      "PointNetMLPJoint_absolute_min_loglife_error": 0.10526657104492188,
+      "PointNetMLPJoint_absolute_max_stress_error_mpa": 26.9306640625,
+      "PointNetMLPJoint_FP_signed_min_loglife_error": 0.02734375,
+      "PointNetMLPJoint_FP_absolute_min_loglife_error": 0.02734375,
+      "PointNetMLPJoint_FP_absolute_max_stress_error_mpa": 7.3182373046875,
+      "PointNetMLPJoint_weighted_signed_min_loglife_error": 0.0569157600402832,
+      "PointNetMLPJoint_weighted_absolute_min_loglife_error": 0.0569157600402832,
+      "PointNetMLPJoint_weighted_absolute_max_stress_error_mpa": 15.78564453125
+    },
+    {
+      "selection": "critical_life",
+      "sample_id": "2809",
+      "true_min_loglife": 1.1382453441619873,
+      "true_min_life_cycles": 13.748184260862612,
+      "true_max_stress_mpa": 1296.48095703125,
+      "governing_zone": "lower_transition",
+      "governing_subzone": "lower_transition",
+      "geometry_attributes": {
+        "blade_equiv_force_N": 331200.0,
+        "blade_equiv_load_description": "annular_blade_mass_centrifugal_surrogate_rim_top_ligament_arm_land_face",
+        "sample_id": "2809",
+        "seed": "29244589"
+      },
+      "ArGEnT_self_att_noSDF_signed_min_loglife_error": 0.3470723628997803,
+      "ArGEnT_self_att_noSDF_absolute_min_loglife_error": 0.3470723628997803,
+      "ArGEnT_self_att_noSDF_absolute_max_stress_error_mpa": 72.7998046875,
+      "PointNetMLPJoint_signed_min_loglife_error": 0.1287095546722412,
+      "PointNetMLPJoint_absolute_min_loglife_error": 0.1287095546722412,
+      "PointNetMLPJoint_absolute_max_stress_error_mpa": 32.9775390625,
+      "PointNetMLPJoint_FP_signed_min_loglife_error": 0.02721714973449707,
+      "PointNetMLPJoint_FP_absolute_min_loglife_error": 0.02721714973449707,
+      "PointNetMLPJoint_FP_absolute_max_stress_error_mpa": 11.2354736328125,
+      "PointNetMLPJoint_weighted_signed_min_loglife_error": -0.12862324714660645,
+      "PointNetMLPJoint_weighted_absolute_min_loglife_error": 0.12862324714660645,
+      "PointNetMLPJoint_weighted_absolute_max_stress_error_mpa": 8.22314453125
+    },
+    {
+      "selection": "model_disagreement",
+      "sample_id": "2146",
+      "true_min_loglife": 2.0374562740325928,
+      "true_min_life_cycles": 109.00747351261555,
+      "true_max_stress_mpa": 1105.5948486328125,
+      "governing_zone": "lower_transition",
+      "governing_subzone": "lower_transition",
+      "geometry_attributes": {
+        "blade_equiv_force_N": 331200.0,
+        "blade_equiv_load_description": "annular_blade_mass_centrifugal_surrogate_rim_top_ligament_arm_land_face",
+        "sample_id": "2146",
+        "seed": "23994292"
+      },
+      "ArGEnT_self_att_noSDF_signed_min_loglife_error": -0.4415738582611084,
+      "ArGEnT_self_att_noSDF_absolute_min_loglife_error": 0.4415738582611084,
+      "ArGEnT_self_att_noSDF_absolute_max_stress_error_mpa": 86.49609375,
+      "PointNetMLPJoint_signed_min_loglife_error": -0.4303576946258545,
+      "PointNetMLPJoint_absolute_min_loglife_error": 0.4303576946258545,
+      "PointNetMLPJoint_absolute_max_stress_error_mpa": 76.402099609375,
+      "PointNetMLPJoint_FP_signed_min_loglife_error": -0.004106760025024414,
+      "PointNetMLPJoint_FP_absolute_min_loglife_error": 0.004106760025024414,
+      "PointNetMLPJoint_FP_absolute_max_stress_error_mpa": 1.528076171875,
+      "PointNetMLPJoint_weighted_signed_min_loglife_error": -0.4410727024078369,
+      "PointNetMLPJoint_weighted_absolute_min_loglife_error": 0.4410727024078369,
+      "PointNetMLPJoint_weighted_absolute_max_stress_error_mpa": 77.830322265625
+    }
+  ]
+}

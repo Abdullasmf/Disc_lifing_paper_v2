@@ -1,0 +1,12 @@
+{
+  "Uniform": {
+    "median": 3958,
+    "critical_life": 2809,
+    "model_disagreement": 1418
+  },
+  "Zonal": {
+    "median": 293,
+    "critical_life": 2809,
+    "model_disagreement": 2146
+  }
+}

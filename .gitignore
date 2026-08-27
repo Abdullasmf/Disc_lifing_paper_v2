@@ -22,7 +22,7 @@ ENV/
 
 # VS Code specific files
 .vscode/
-
+*.pdf
 # ANSYS
 *.rst
 *.log

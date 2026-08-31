@@ -1,0 +1,56 @@
+{
+  "commit": "30d3aa17a0467cd2f0d123c1878615b8d85ff2b2",
+  "dataset_available": false,
+  "valid_pairs": [
+    {
+      "pair_id": "ArGEnT_self_att_noSDF__ca5324d5b4e306c2",
+      "model_family": "ArGEnT_self_att_noSDF",
+      "fp_status": "non-FP",
+      "stress_variant": "argent_self_nosdf_s_177b264d",
+      "no_stress_variant": "argent_self_nosdf_s_cf025919",
+      "stress_checkpoint_path": "/home/runner/work/Disc_lifing_paper_v2/Disc_lifing_paper_v2/Zonal/Edge/ArGEnT_self_att_noSDF/Trained_models/argent_self_nosdf_s_177b264d.pt",
+      "no_stress_checkpoint_path": "/home/runner/work/Disc_lifing_paper_v2/Disc_lifing_paper_v2/Zonal/Edge_no_stress/ArGEnT_self_att_noSDF/Trained_models/argent_self_nosdf_s_cf025919.pt",
+      "training_config_id": "ca5324d5b4e306c2",
+      "split_seed": 42,
+      "eval_fraction": 0.2,
+      "training_fraction": NaN,
+      "effective_h5_filename": "disc_dataset_edge_deriv_zonal.h5",
+      "effective_representation": "edge",
+      "effective_geometry_family": "disc"
+    },
+    {
+      "pair_id": "PointNetMLPJoint_FP__15c46d5f9f6e469b",
+      "model_family": "PointNetMLPJoint_FP",
+      "fp_status": "FP",
+      "stress_variant": "pnmlp_16932d84",
+      "no_stress_variant": "pnmlp_1bbaae12",
+      "stress_checkpoint_path": "/home/runner/work/Disc_lifing_paper_v2/Disc_lifing_paper_v2/Zonal/Edge/PointNetMLPJoint_FP/Trained_models/pnmlp_16932d84.pt",
+      "no_stress_checkpoint_path": "/home/runner/work/Disc_lifing_paper_v2/Disc_lifing_paper_v2/Zonal/Edge_no_stress/PointNetMLPJoint_FP/Trained_models/pnmlp_1bbaae12.pt",
+      "training_config_id": "15c46d5f9f6e469b",
+      "split_seed": 42,
+      "eval_fraction": 0.2,
+      "training_fraction": NaN,
+      "effective_h5_filename": "disc_dataset_edge_deriv_zonal.h5",
+      "effective_representation": "edge",
+      "effective_geometry_family": "disc"
+    }
+  ],
+  "overall_mae": {
+    "label": "insufficient evidence",
+    "median": NaN,
+    "fraction_positive": NaN,
+    "n": 0
+  },
+  "overall_rmse": {
+    "label": "insufficient evidence",
+    "median": NaN,
+    "fraction_positive": NaN,
+    "n": 0
+  },
+  "critical_low_life_mae": {
+    "label": "insufficient evidence",
+    "median": NaN,
+    "fraction_positive": NaN,
+    "n": 0
+  }
+}

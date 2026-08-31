@@ -112,12 +112,17 @@ def pooled_metrics_from_nodes(node_df: pd.DataFrame) -> pd.DataFrame:
 # LogLife criticality bins
 # ---------------------------------------------------------------------------
 
+FULL_TEST_SET_LABEL = "Full test set"
 BIN_DEFS: List[Tuple[str, Optional[float], Optional[float]]] = [
-    ("LogLife < 2", None, 2.0),
-    ("2 <= LogLife < 3", 2.0, 3.0),
-    ("3 <= LogLife < 4", 3.0, 4.0),
-    ("4 <= LogLife < 6", 4.0, 6.0),
-    ("LogLife >= 6", 6.0, None),
+    ("log_life < 2", None, 2.0),
+    ("2 <= log_life < 3", 2.0, 3.0),
+    ("3 <= log_life < 4", 3.0, 4.0),
+    ("4 <= log_life < 6", 4.0, 6.0),
+    ("log_life >= 6", 6.0, None),
+]
+ALL_LIFE_BIN_DEFS: List[Tuple[str, Optional[float], Optional[float]]] = [
+    (FULL_TEST_SET_LABEL, None, None),
+    *BIN_DEFS,
 ]
 
 
@@ -129,7 +134,7 @@ def loglife_bin_metrics(node_df: pd.DataFrame) -> pd.DataFrame:
         regime, ablation, model_family = keys
         t_all = g["true_loglife"].to_numpy()
         p_all = g["pred_loglife"].to_numpy()
-        for bin_name, lo, hi in BIN_DEFS:
+        for bin_name, lo, hi in ALL_LIFE_BIN_DEFS:
             mask = np.ones_like(t_all, dtype=bool)
             if lo is not None:
                 mask &= (t_all >= lo)
@@ -140,7 +145,12 @@ def loglife_bin_metrics(node_df: pd.DataFrame) -> pd.DataFrame:
             unstable = n < MIN_BIN_NODES
             records.append({
                 "regime": regime, "ablation": ablation, "model_family": model_family,
-                "bin": bin_name, "n_nodes": n,
+                "life_bin": bin_name, "bin": bin_name,
+                "n_samples": n, "n_nodes": n,
+                "mae_loglife": float(np.mean(np.abs(err))) if n else np.nan,
+                "rmse_loglife": float(np.sqrt(np.mean(err ** 2))) if n else np.nan,
+                "signed_mean_error_loglife": float(np.mean(err)) if n else np.nan,
+                "median_abs_error_loglife": float(np.median(np.abs(err))) if n else np.nan,
                 "MAE": float(np.mean(np.abs(err))) if n else np.nan,
                 "RMSE": float(np.sqrt(np.mean(err ** 2))) if n else np.nan,
                 "signed_mean_error": float(np.mean(err)) if n else np.nan,
@@ -491,21 +501,23 @@ def plot_bin_bar(bin_df: pd.DataFrame, title: str, out_dir: Optional[Path] = Non
     if bin_df.empty:
         return None
     fig, axes = plt.subplots(1, 2, figsize=(13, 4.5))
-    bins = [b for b, _, _ in BIN_DEFS]
+    bins = [b for b, _, _ in ALL_LIFE_BIN_DEFS]
     families = sorted(bin_df["model_family"].unique())
     for ax, metric in zip(axes, ["MAE", "RMSE"]):
         x = np.arange(len(bins), dtype=float)
         width = 0.8 / max(1, len(families))
         for i, fam in enumerate(families):
-            sub = bin_df[bin_df["model_family"] == fam].set_index("bin")
-            vals = [sub.loc[b, metric] if b in sub.index else np.nan for b in bins]
+            bin_col = "life_bin" if "life_bin" in bin_df.columns else "bin"
+            sub = bin_df[bin_df["model_family"] == fam].set_index(bin_col)
+            metric_col = metric if metric in sub.columns else metric.lower() + "_loglife"
+            vals = [sub.loc[b, metric_col] if b in sub.index else np.nan for b in bins]
             unstable = [sub.loc[b, "unstable"] if b in sub.index else True for b in bins]
             bars = ax.bar(x + (i - (len(families) - 1) / 2) * width, vals, width=width, label=fam)
             for b_, u in zip(bars, unstable):
                 if u:
                     ax.text(b_.get_x() + b_.get_width() / 2, (b_.get_height() or 0), "unstable", ha="center", va="bottom", fontsize=6, color="red", rotation=90)
         ax.set_xticks(x); ax.set_xticklabels(bins, rotation=20)
-        ax.set_ylabel(f"LogLife {metric}"); ax.legend(fontsize=7)
+        ax.set_ylabel(f"log_life {metric} (decades)"); ax.legend(fontsize=7)
     fig.suptitle(title)
     fig.tight_layout()
     if out_dir is not None and filename:

@@ -11,11 +11,9 @@ The goal of the paper-results notebooks is not to retrain models; it is to produ
 The suite is organized around four paper analyses:
 
 1. **`01_fp_vs_argent.ipynb`** – compares `PointNetMLPJoint_FP`, `PointNetMLPJoint`, and `ArGEnT_self_att_noSDF` on Uniform/Edge and Zonal/Edge.
-2. **`02_engineered_geometric_features.ipynb`** – intended for the `Edge_arc_feat` ablation (`PointNetMLPJoint_headfeat`, `PointNetMLPJoint_FP_headfeat`, and ArGEnT counterpart where applicable).
-3. **`03_data_efficiency.ipynb`** – intended for the `Edge_10`, `Edge_25`, `Edge_50`, and `Edge_75` subset comparison.
-4. **`04_joint_stress_supervision.ipynb`** – intended for the `Edge_no_stress` / weighted-loss supervision study.
-
-In this repository snapshot, notebook 01 is created explicitly; the other notebook names define the paper suite structure and expected follow-on analyses.
+2. **`02_engineered_geometric_features.ipynb`** – evaluates the `Edge_arc_feat` ablation for `PointNetMLPJoint_headfeat` and `PointNetMLPJoint_FP_headfeat`. **ArGEnT is excluded** because its self-attention mode (`attention_type='self'`) does not process `geom_points`, so the engineered arc-length and curvature features in `INPUT_COLS` are discarded at inference. See the notebook opening cell for details.
+3. **`03_data_efficiency.ipynb`** – evaluates the `Edge_10`, `Edge_25`, `Edge_50`, and `Edge_75` subset comparison.
+4. **`04_joint_stress_supervision.ipynb`** – evaluates the `Edge_no_stress` / joint stress-supervision study.
 
 ## 3. Example HDF5 files
 
@@ -72,30 +70,43 @@ For this reason, the notebooks treat pooled metrics as necessary but insufficien
 
 ## 9. Output artifact structure under `Comparison/results/`
 
-Each notebook writes into its own subdirectory, for example:
+Each notebook writes into its own subdirectory. The artifact budget is kept compact:
+**no per-node CSV** (`node_results.csv`), **no per-geometry CSV** (`geometry_level_metrics.csv`).
 
 ```text
 Comparison/results/
   01_fp_vs_argent/
-    checkpoint_integrity.json
-    evaluation_split_provenance.json
-    node_results.csv
-    pooled_metrics.csv
-    low_life_bins.csv
-    subzone_metrics.csv
-    geometry_level_metrics.csv
-    geometry_level_summary.csv
-    paired_argent_minus_fp.csv
-    paired_pointnet_minus_fp.csv
+    pooled_metrics.csv             (whole-field Stress/LogLife metrics per model/regime)
+    low_life_bins.csv              (LogLife<4 and LogLife<3 bin metrics)
+    subzone_metrics.csv            (critical-subzone MAE per model/regime)
+    summary_table.csv              (compact: pooled + critical-region metrics in one table)
+    paired_summary.csv             (geometry-paired min-life comparison: ArGEnT-FP and PointNet-FP)
     representative_geometry_ids.json
     run_metadata.json
-    artifact_listing.json
     figures/
       uniform/
       zonal/
+  02_engineered_geometric_features/
+    summary_table.csv
+    paired_summary.csv
+    cross_notebook_edge_vs_edge_arc_feat.csv
+    representative_geometry_ids.json
+    run_metadata.json              (includes argent_excluded_reason)
+    figures/
+  03_data_efficiency/
+    summary_by_fraction.csv        (pooled + critical-region metrics per training fraction)
+    run_metadata.json
+    figures/
+  04_joint_stress_supervision/
+    summary_table.csv
+    paired_pooled_summary.csv
+    paired_bins_summary.csv
+    paired_zones_summary.csv
+    run_metadata.json
+    figures/
 ```
 
-The exact file list can grow as new figures or summaries are added, but the notebook should always emit an artifact listing for traceability.
+The `run_metadata.json` in each subdirectory records the git commit SHA, evaluation label, and model families for provenance.
 
 ## 10. Scope exclusions
 
@@ -104,7 +115,10 @@ These notebooks do **not**:
 - train or fine-tune models,
 - change checkpoints,
 - certify physical validity beyond the stored datasets,
-- replace independent test-set evaluation,
+- claim that any single model is universally superior,
+- replace an independent external evaluation split,
 - or claim deployment readiness.
+
+Results are labelled **validation-split evaluation**: the same deterministic 20% geometry holdout (seed 42) used across all notebooks. Do not call this a test set unless independent provenance of the split from checkpoint selection is established.
 
 They are paper-support tools for transparent comparison of already trained research models.

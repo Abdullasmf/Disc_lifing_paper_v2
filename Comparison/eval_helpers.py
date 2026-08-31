@@ -12,6 +12,7 @@ Expected "node_results" DataFrame schema (one row per evaluated query node):
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
@@ -143,18 +144,22 @@ def loglife_bin_metrics(node_df: pd.DataFrame) -> pd.DataFrame:
             n = int(mask.sum())
             err = p_all[mask] - t_all[mask]
             unstable = n < MIN_BIN_NODES
+            mae_loglife = float(np.mean(np.abs(err))) if n else np.nan
+            rmse_loglife = float(np.sqrt(np.mean(err ** 2))) if n else np.nan
+            signed_mean_error_loglife = float(np.mean(err)) if n else np.nan
+            median_abs_error_loglife = float(np.median(np.abs(err))) if n else np.nan
             records.append({
                 "regime": regime, "ablation": ablation, "model_family": model_family,
                 "life_bin": bin_name, "bin": bin_name,
                 "n_samples": n, "n_nodes": n,
-                "mae_loglife": float(np.mean(np.abs(err))) if n else np.nan,
-                "rmse_loglife": float(np.sqrt(np.mean(err ** 2))) if n else np.nan,
-                "signed_mean_error_loglife": float(np.mean(err)) if n else np.nan,
-                "median_abs_error_loglife": float(np.median(np.abs(err))) if n else np.nan,
-                "MAE": float(np.mean(np.abs(err))) if n else np.nan,
-                "RMSE": float(np.sqrt(np.mean(err ** 2))) if n else np.nan,
-                "signed_mean_error": float(np.mean(err)) if n else np.nan,
-                "median_abs_error": float(np.median(np.abs(err))) if n else np.nan,
+                "mae_loglife": mae_loglife,
+                "rmse_loglife": rmse_loglife,
+                "signed_mean_error_loglife": signed_mean_error_loglife,
+                "median_abs_error_loglife": median_abs_error_loglife,
+                "MAE": mae_loglife,
+                "RMSE": rmse_loglife,
+                "signed_mean_error": signed_mean_error_loglife,
+                "median_abs_error": median_abs_error_loglife,
                 "unstable": bool(unstable),
             })
     return pd.DataFrame(records)
@@ -600,6 +605,25 @@ def save_table(df: pd.DataFrame, out_dir: Path, name: str) -> None:
 
 
 def save_json(obj: Any, out_dir: Path, name: str) -> None:
+    """Save JSON with non-finite numeric values normalized to JSON null."""
+
+    def _json_ready(value: Any) -> Any:
+        if isinstance(value, dict):
+            return {str(k): _json_ready(v) for k, v in value.items()}
+        if isinstance(value, (list, tuple)):
+            return [_json_ready(v) for v in value]
+        if isinstance(value, np.ndarray):
+            return [_json_ready(v) for v in value]
+        if isinstance(value, (np.floating, float)):
+            return None if not math.isfinite(float(value)) else float(value)
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, (np.integer, int)):
+            return int(value)
+        if isinstance(value, Path):
+            return str(value)
+        return value
+
     out_dir.mkdir(parents=True, exist_ok=True)
     with open(out_dir / f"{name}.json", "w", encoding="utf-8") as f:
-        json.dump(obj, f, indent=2, default=str)
+        json.dump(_json_ready(obj), f, indent=2, default=str, allow_nan=False)

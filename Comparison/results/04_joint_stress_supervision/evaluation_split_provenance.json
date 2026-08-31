@@ -10,8 +10,8 @@
   "evaluation_sample_ids": [],
   "training_positional_indices": [],
   "evaluation_positional_indices": [],
-  "timestamp_utc": "2026-08-31T19:34:02Z",
-  "notebook_commit_sha": "30d3aa17a0467cd2f0d123c1878615b8d85ff2b2",
+  "timestamp_utc": "2026-08-31T19:40:59Z",
+  "notebook_commit_sha": "ddaee34d2731dcfd06546c32f62b0ec9d863f9bf",
   "evaluation_label": "validation-split evaluation",
   "dataset_available": false,
   "independence_basis": "A deterministic geometry holdout is used, but checkpoint-selection independence is not proved."

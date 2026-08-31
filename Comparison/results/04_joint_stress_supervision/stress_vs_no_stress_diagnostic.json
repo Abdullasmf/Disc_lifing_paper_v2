@@ -11,7 +11,7 @@
       "training_config_id": "ca5324d5b4e306c2",
       "split_seed": 42,
       "eval_fraction": 0.2,
-      "training_fraction": NaN,
+      "training_fraction": null,
       "effective_h5_filename": "disc_dataset_edge_deriv_zonal.h5",
       "effective_representation": "edge",
       "effective_geometry_family": "disc"
@@ -27,7 +27,7 @@
       "training_config_id": "15c46d5f9f6e469b",
       "split_seed": 42,
       "eval_fraction": 0.2,
-      "training_fraction": NaN,
+      "training_fraction": null,
       "effective_h5_filename": "disc_dataset_edge_deriv_zonal.h5",
       "effective_representation": "edge",
       "effective_geometry_family": "disc"

@@ -1,5 +1,5 @@
 {
-  "commit": "30d3aa17a0467cd2f0d123c1878615b8d85ff2b2",
+  "commit": "ddaee34d2731dcfd06546c32f62b0ec9d863f9bf",
   "dataset_available": false,
   "valid_pairs": [
     {
@@ -13,7 +13,7 @@
       "training_config_id": "ca5324d5b4e306c2",
       "split_seed": 42,
       "eval_fraction": 0.2,
-      "training_fraction": NaN,
+      "training_fraction": null,
       "effective_h5_filename": "disc_dataset_edge_deriv_zonal.h5",
       "effective_representation": "edge",
       "effective_geometry_family": "disc"
@@ -29,7 +29,7 @@
       "training_config_id": "15c46d5f9f6e469b",
       "split_seed": 42,
       "eval_fraction": 0.2,
-      "training_fraction": NaN,
+      "training_fraction": null,
       "effective_h5_filename": "disc_dataset_edge_deriv_zonal.h5",
       "effective_representation": "edge",
       "effective_geometry_family": "disc"
@@ -37,20 +37,20 @@
   ],
   "overall_mae": {
     "label": "insufficient evidence",
-    "median": NaN,
-    "fraction_positive": NaN,
+    "median": null,
+    "fraction_positive": null,
     "n": 0
   },
   "overall_rmse": {
     "label": "insufficient evidence",
-    "median": NaN,
-    "fraction_positive": NaN,
+    "median": null,
+    "fraction_positive": null,
     "n": 0
   },
   "critical_low_life_mae": {
     "label": "insufficient evidence",
-    "median": NaN,
-    "fraction_positive": NaN,
+    "median": null,
+    "fraction_positive": null,
     "n": 0
   }
 }

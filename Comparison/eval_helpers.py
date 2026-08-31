@@ -156,7 +156,11 @@ def loglife_bin_metrics(node_df: pd.DataFrame) -> pd.DataFrame:
 
 def zone_metrics_from_nodes(node_df: pd.DataFrame, label_col: str = "subzone_name",
                              required_labels: Optional[Sequence[str]] = None) -> pd.DataFrame:
-    """Compatibility wrapper that now returns grouped physical-region metrics."""
+    """Compatibility wrapper that now returns grouped physical-region metrics.
+
+    `label_col` and `required_labels` are ignored to preserve old call sites.
+    """
+    _ = label_col, required_labels
     return grouped_region_metrics_from_nodes(node_df)
 
 
@@ -230,14 +234,15 @@ def geometry_level_metrics(node_df: pd.DataFrame) -> pd.DataFrame:
         same_subzone = bool(g["subzone_id"].iloc[pred_crit_idx] == g["subzone_id"].iloc[true_crit_idx]) \
             if g["subzone_id"].notna().any() else None
 
+        min_life_err = float(pred_life[true_crit_idx] - true_life[true_crit_idx])
         records.append({
             "regime": regime, "ablation": ablation, "model_family": model_family, "sample_id": sample_id,
             "whole_geometry_loglife_mae": _mae(true_life, pred_life),
             "whole_geometry_stress_mae": _mae(true_stress, pred_stress),
             "true_min_loglife": float(true_life[true_crit_idx]),
             "pred_min_loglife": float(pred_life[pred_crit_idx]),
-            "min_loglife_error_decades": float(pred_life[true_crit_idx] - true_life[true_crit_idx]),
-            "abs_min_loglife_error_decades": float(abs(pred_life[true_crit_idx] - true_life[true_crit_idx])),
+            "min_loglife_error_decades": min_life_err,
+            "abs_min_loglife_error_decades": float(abs(min_life_err)),
             "true_crit_x_mm": float(g["x_mm"].iloc[true_crit_idx]), "true_crit_r_mm": float(g["r_mm"].iloc[true_crit_idx]),
             "pred_crit_x_mm": float(g["x_mm"].iloc[pred_crit_idx]), "pred_crit_r_mm": float(g["r_mm"].iloc[pred_crit_idx]),
             "crit_node_distance_mm": crit_dist_mm,

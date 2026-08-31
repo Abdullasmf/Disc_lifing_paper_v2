@@ -403,10 +403,21 @@ def plot_field_comparison(geom_nodes_by_model: Dict[str, pd.DataFrame], field_tr
             ti, pi = int(np.argmin(t)), int(np.argmin(p))
         else:
             ti, pi = int(np.argmax(t)), int(np.argmax(p))
+        # Compute equal-aspect bounds from the coordinate data so the disc
+        # reads as a disc rather than an I-beam-like elongated shape.
+        x_c = float(np.nanmean([x.min(), x.max()]))
+        r_c = float(np.nanmean([r.min(), r.max()]))
+        half_range = max(
+            float(np.nanmax(np.abs(x - x_c))),
+            float(np.nanmax(np.abs(r - r_c))),
+        ) * 1.05 + 1e-6
         for ax in axes[:, j]:
             ax.scatter([x[ti]], [r[ti]], marker="*", s=160, edgecolor="k", facecolor="lime", label="true extremum", zorder=5)
             ax.scatter([x[pi]], [r[pi]], marker="X", s=120, edgecolor="k", facecolor="orange", label="pred extremum", zorder=5)
             ax.set_xlabel("x (mm)"); ax.set_ylabel("r (mm)")
+            ax.set_aspect("equal", adjustable="box")
+            ax.set_xlim(x_c - half_range, x_c + half_range)
+            ax.set_ylim(r_c - half_range, r_c + half_range)
         axes[0, j].legend(loc="upper right", fontsize=7)
 
     fig.suptitle(title_prefix)

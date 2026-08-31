@@ -11,7 +11,7 @@ The goal of the paper-results notebooks is not to retrain models; it is to produ
 The suite is organized around four paper analyses:
 
 1. **`01_fp_vs_argent.ipynb`** – compares `PointNetMLPJoint_FP`, `PointNetMLPJoint`, and `ArGEnT_self_att_noSDF` on Uniform/Edge and Zonal/Edge.
-2. **`02_engineered_geometric_features.ipynb`** – evaluates the `Edge_arc_feat` ablation for `PointNetMLPJoint_headfeat` and `PointNetMLPJoint_FP_headfeat`. **ArGEnT is excluded** because its self-attention mode (`attention_type='self'`) does not process `geom_points`, so the engineered arc-length and curvature features in `INPUT_COLS` are discarded at inference. See the notebook opening cell for details.
+2. **`02_engineered_geometric_features.ipynb`** – evaluates the `Edge_arc_feat` ablation for `ArGEnT_self_att_noSDF`, `PointNetMLPJoint_headfeat`, and `PointNetMLPJoint_FP_headfeat`. ArGEnT consumes engineered descriptors through its self-attended point-token input; unlike PointNet checkpoints, ArGEnT feature configuration is defined by its training-script `INPUT_COLS`.
 3. **`03_data_efficiency.ipynb`** – evaluates the `Edge_10`, `Edge_25`, `Edge_50`, and `Edge_75` subset comparison.
 4. **`04_joint_stress_supervision.ipynb`** – evaluates the `Edge_no_stress` / joint stress-supervision study.
 
@@ -57,16 +57,16 @@ All outputs from the current suite should be labelled **validation-split evaluat
 The helper module `eval_helpers.py` computes the main paper diagnostics:
 
 - **Pooled metrics**: node-level pooled stress and log-life MSE / RMSE / MAE / R².
-- **Low-life bin metrics**: log-life errors for all nodes, `LogLife<4`, `LogLife<3`, and `LogLife<2` subsets.
-- **Subzone metrics**: MAE / RMSE over principal subzones such as `lower_transition`, `front_cgroove`, and rear-arm regions.
-- **Geometry-level metrics**: per-geometry minimum-life error, critical-node localisation distance, maximum-stress error, and same-zone agreement.
+- **Life-band metrics**: log-life errors over fixed bands (`<2`, `2-3`, `3-4`, `4-6`, `>=6`).
+- **Grouped-region metrics**: MAE / RMSE over fixed physical groups (critical lower transition, rim features, remaining contour).
+- **Geometry-level metrics**: per-geometry whole-field LogLife MAE, whole-field Stress MAE (where available), absolute minimum-life error, absolute maximum-stress error, and same-zone agreement.
 - **Paired comparisons**: geometry-by-geometry differences between competing families so sign conventions stay explicit.
 
 ## 8. Why pooled R² and raw-life Max_PE must not be interpreted alone
 
 A very high pooled **R²** can coexist with poor behaviour in the fatigue-critical tail because most nodes are easier than the minimum-life region. Likewise, raw-life **`Max_PE (%)`** can be dominated by a small number of very low true-life values, making it too volatile to rank models by itself.
 
-For this reason, the notebooks treat pooled metrics as necessary but insufficient evidence. Low-life bins, lower-transition/subzone metrics, paired minimum-life comparisons, and representative field maps must all be checked before drawing conclusions about local fatigue-critical usefulness.
+For this reason, the notebooks treat pooled metrics as necessary but insufficient evidence. Full life-band metrics, grouped physical-region metrics, and geometry-level diagnostics must all be checked before drawing conclusions about local fatigue-critical usefulness.
 
 ## 9. Output artifact structure under `Comparison/results/`
 
@@ -77,8 +77,8 @@ Each notebook writes into its own subdirectory. The artifact budget is kept comp
 Comparison/results/
   01_fp_vs_argent/
     pooled_metrics.csv             (whole-field Stress/LogLife metrics per model/regime)
-    low_life_bins.csv              (LogLife<4 and LogLife<3 bin metrics)
-    subzone_metrics.csv            (critical-subzone MAE per model/regime)
+    life_band_metrics.csv          (full LogLife band metrics)
+    grouped_region_metrics.csv     (three grouped physical regions)
     summary_table.csv              (compact: pooled + critical-region metrics in one table)
     paired_summary.csv             (geometry-paired min-life comparison: ArGEnT-FP and PointNet-FP)
     representative_geometry_ids.json
@@ -91,7 +91,7 @@ Comparison/results/
     paired_summary.csv
     cross_notebook_edge_vs_edge_arc_feat.csv
     representative_geometry_ids.json
-    run_metadata.json              (includes argent_excluded_reason)
+    run_metadata.json
     figures/
   03_data_efficiency/
     summary_by_fraction.csv        (pooled + critical-region metrics per training fraction)

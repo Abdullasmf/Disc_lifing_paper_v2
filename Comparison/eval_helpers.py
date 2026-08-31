@@ -28,12 +28,11 @@ SUBZONE_ID_TO_NAME: Dict[int, str] = {
     5: "front_face", 6: "front_cgroove", 7: "rear_arm_neck", 8: "rear_arm_land",
     9: "rear_arm_corner", 10: "rear_arm_end_face",
 }
-# Principal subzones requested for reporting (front_face intentionally omitted
-# from the "must include" list per spec, but is not hidden if present).
-PRINCIPAL_SUBZONES: List[str] = [
-    "bore", "lower_transition", "web", "upper_transition", "rim_main",
-    "front_cgroove", "rear_arm_neck", "rear_arm_land", "rear_arm_corner",
-]
+GROUPED_REGION_DEFS: Dict[str, List[str]] = {
+    "Critical lower transition": ["lower_transition"],
+    "Rim features": ["rim_main", "front_cgroove", "rear_arm_neck", "rear_arm_land", "rear_arm_corner"],
+    "Remaining contour": ["bore", "web", "upper_transition"],
+}
 
 MIN_BIN_NODES = 30  # below this a bin's aggregate is flagged unstable
 MIN_ZONE_NODES = 20
@@ -113,7 +112,13 @@ def pooled_metrics_from_nodes(node_df: pd.DataFrame) -> pd.DataFrame:
 # LogLife criticality bins
 # ---------------------------------------------------------------------------
 
-BIN_DEFS: List[Tuple[str, Optional[float]]] = [("all", None), ("LogLife<4", 4.0), ("LogLife<3", 3.0), ("LogLife<2", 2.0)]
+BIN_DEFS: List[Tuple[str, Optional[float], Optional[float]]] = [
+    ("LogLife < 2", None, 2.0),
+    ("2 <= LogLife < 3", 2.0, 3.0),
+    ("3 <= LogLife < 4", 3.0, 4.0),
+    ("4 <= LogLife < 6", 4.0, 6.0),
+    ("LogLife >= 6", 6.0, None),
+]
 
 
 def loglife_bin_metrics(node_df: pd.DataFrame) -> pd.DataFrame:
@@ -124,8 +129,12 @@ def loglife_bin_metrics(node_df: pd.DataFrame) -> pd.DataFrame:
         regime, ablation, model_family = keys
         t_all = g["true_loglife"].to_numpy()
         p_all = g["pred_loglife"].to_numpy()
-        for bin_name, thresh in BIN_DEFS:
-            mask = np.ones_like(t_all, dtype=bool) if thresh is None else (t_all < thresh)
+        for bin_name, lo, hi in BIN_DEFS:
+            mask = np.ones_like(t_all, dtype=bool)
+            if lo is not None:
+                mask &= (t_all >= lo)
+            if hi is not None:
+                mask &= (t_all < hi)
             n = int(mask.sum())
             err = p_all[mask] - t_all[mask]
             unstable = n < MIN_BIN_NODES
@@ -135,7 +144,7 @@ def loglife_bin_metrics(node_df: pd.DataFrame) -> pd.DataFrame:
                 "MAE": float(np.mean(np.abs(err))) if n else np.nan,
                 "RMSE": float(np.sqrt(np.mean(err ** 2))) if n else np.nan,
                 "signed_mean_error": float(np.mean(err)) if n else np.nan,
-                "max_abs_error": float(np.max(np.abs(err))) if n else np.nan,
+                "median_abs_error": float(np.median(np.abs(err))) if n else np.nan,
                 "unstable": bool(unstable),
             })
     return pd.DataFrame(records)
@@ -147,28 +156,51 @@ def loglife_bin_metrics(node_df: pd.DataFrame) -> pd.DataFrame:
 
 def zone_metrics_from_nodes(node_df: pd.DataFrame, label_col: str = "subzone_name",
                              required_labels: Optional[Sequence[str]] = None) -> pd.DataFrame:
+    """Compatibility wrapper that now returns grouped physical-region metrics.
+
+    `label_col` and `required_labels` are ignored to preserve old call sites.
+    """
+    _ = label_col, required_labels
+    return grouped_region_metrics_from_nodes(node_df)
+
+
+def grouped_region_metrics_from_nodes(node_df: pd.DataFrame) -> pd.DataFrame:
     if node_df.empty:
         return pd.DataFrame()
-    required = list(required_labels) if required_labels is not None else PRINCIPAL_SUBZONES
+    subzone_to_group = {
+        subzone: group
+        for group, subzones in GROUPED_REGION_DEFS.items()
+        for subzone in subzones
+    }
+    node_df = node_df.copy()
+    node_df["grouped_region"] = node_df["subzone_name"].map(subzone_to_group)
     records: List[Dict[str, Any]] = []
     for keys, g in node_df.groupby(GROUP_COLS):
         regime, ablation, model_family = keys
-        present = {lbl: sub for lbl, sub in g.groupby(label_col)}
-        for lbl in required:
-            sub = present.get(lbl)
-            if sub is None or sub[label_col].isna().all():
+        for label, subzones in GROUPED_REGION_DEFS.items():
+            sub = g[g["subzone_name"].isin(subzones)]
+            if sub.empty:
                 records.append({
                     "regime": regime, "ablation": ablation, "model_family": model_family,
-                    label_col: lbl, "n_nodes": 0, "MAE": np.nan, "RMSE": np.nan, "status": "missing",
+                    "grouped_region": label, "n_nodes": 0,
+                    "LogLife_MAE": np.nan, "LogLife_RMSE": np.nan,
+                    "signed_mean_LogLife_error": np.nan, "median_abs_LogLife_error": np.nan,
+                    "Stress_MAE": np.nan, "Stress_RMSE": np.nan, "status": "missing",
                 })
                 continue
-            t, p = sub["true_loglife"].to_numpy(), sub["pred_loglife"].to_numpy()
-            n = len(t)
+            tl, pl = sub["true_loglife"].to_numpy(), sub["pred_loglife"].to_numpy()
+            ts, ps = sub["true_stress"].to_numpy(), sub["pred_stress"].to_numpy()
+            err_l = pl - tl
+            finite_stress = np.isfinite(ts) & np.isfinite(ps)
             records.append({
                 "regime": regime, "ablation": ablation, "model_family": model_family,
-                label_col: lbl, "n_nodes": n,
-                "MAE": _mae(t, p), "RMSE": _rmse(t, p),
-                "status": "ok" if n >= MIN_ZONE_NODES else "unstable_low_count",
+                "grouped_region": label, "n_nodes": int(len(sub)),
+                "LogLife_MAE": _mae(tl, pl), "LogLife_RMSE": _rmse(tl, pl),
+                "signed_mean_LogLife_error": float(np.mean(err_l)),
+                "median_abs_LogLife_error": float(np.median(np.abs(err_l))),
+                "Stress_MAE": _mae(ts[finite_stress], ps[finite_stress]) if finite_stress.any() else np.nan,
+                "Stress_RMSE": _rmse(ts[finite_stress], ps[finite_stress]) if finite_stress.any() else np.nan,
+                "status": "ok" if len(sub) >= MIN_ZONE_NODES else "unstable_low_count",
             })
     return pd.DataFrame(records)
 
@@ -202,17 +234,22 @@ def geometry_level_metrics(node_df: pd.DataFrame) -> pd.DataFrame:
         same_subzone = bool(g["subzone_id"].iloc[pred_crit_idx] == g["subzone_id"].iloc[true_crit_idx]) \
             if g["subzone_id"].notna().any() else None
 
+        min_life_err = float(pred_life[true_crit_idx] - true_life[true_crit_idx])
         records.append({
             "regime": regime, "ablation": ablation, "model_family": model_family, "sample_id": sample_id,
+            "whole_geometry_loglife_mae": _mae(true_life, pred_life),
+            "whole_geometry_stress_mae": _mae(true_stress, pred_stress),
             "true_min_loglife": float(true_life[true_crit_idx]),
             "pred_min_loglife": float(pred_life[pred_crit_idx]),
-            "min_loglife_error_decades": float(pred_life[pred_crit_idx] - true_life[true_crit_idx]),
+            "min_loglife_error_decades": min_life_err,
+            "abs_min_loglife_error_decades": float(abs(min_life_err)),
             "true_crit_x_mm": float(g["x_mm"].iloc[true_crit_idx]), "true_crit_r_mm": float(g["r_mm"].iloc[true_crit_idx]),
             "pred_crit_x_mm": float(g["x_mm"].iloc[pred_crit_idx]), "pred_crit_r_mm": float(g["r_mm"].iloc[pred_crit_idx]),
             "crit_node_distance_mm": crit_dist_mm,
             "true_max_stress": float(true_stress[true_max_s_idx]),
             "pred_max_stress": float(pred_stress[pred_max_s_idx]),
             "max_stress_error": float(pred_stress[pred_max_s_idx] - true_stress[true_max_s_idx]),
+            "abs_max_stress_error": float(abs(pred_stress[pred_max_s_idx] - true_stress[true_max_s_idx])),
             "same_zone_critical": same_zone,
             "same_subzone_critical": same_subzone,
             "true_crit_zone": ZONE_ID_TO_NAME.get(int(g["zone_id"].iloc[true_crit_idx])),
@@ -443,7 +480,7 @@ def plot_bin_bar(bin_df: pd.DataFrame, title: str, out_dir: Optional[Path] = Non
     if bin_df.empty:
         return None
     fig, axes = plt.subplots(1, 2, figsize=(13, 4.5))
-    bins = [b for b, _ in BIN_DEFS]
+    bins = [b for b, _, _ in BIN_DEFS]
     families = sorted(bin_df["model_family"].unique())
     for ax, metric in zip(axes, ["MAE", "RMSE"]):
         x = np.arange(len(bins), dtype=float)
@@ -503,6 +540,35 @@ def plot_geometry_scatter(geom_df: pd.DataFrame, out_dir: Optional[Path] = None,
         _save_fig(fig, out_dir, f"{filename_prefix}_min_loglife_error_hist")
     figs.append(fig)
     return figs
+
+
+def plot_geometry_error_distributions(
+    geom_df: pd.DataFrame,
+    title: str,
+    out_dir: Optional[Path] = None,
+    filename: Optional[str] = None,
+):
+    if geom_df.empty:
+        return None
+    families = sorted(geom_df["model_family"].unique())
+    fig, axes = plt.subplots(1, 2, figsize=(12, 4.5))
+    for fam in families:
+        d = geom_df[geom_df["model_family"] == fam]
+        axes[0].hist(d["whole_geometry_loglife_mae"], bins=20, alpha=0.45, label=fam)
+        axes[1].hist(d["abs_min_loglife_error_decades"], bins=20, alpha=0.45, label=fam)
+    axes[0].set_title("A. Per-geometry whole-field LogLife MAE")
+    axes[0].set_xlabel("MAE (decades)")
+    axes[0].set_ylabel("Count")
+    axes[1].set_title("B. Per-geometry absolute minimum-LogLife error")
+    axes[1].set_xlabel("|error| (decades)")
+    axes[1].set_ylabel("Count")
+    for ax in axes:
+        ax.legend(fontsize=7)
+    fig.suptitle(title)
+    fig.tight_layout()
+    if out_dir is not None and filename:
+        _save_fig(fig, out_dir, filename)
+    return fig
 
 
 def save_table(df: pd.DataFrame, out_dir: Path, name: str) -> None:

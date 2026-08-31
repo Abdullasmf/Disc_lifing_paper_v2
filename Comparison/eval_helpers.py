@@ -121,21 +121,32 @@ BIN_DEFS: List[Tuple[str, Optional[float], Optional[float]]] = [
     ("4 <= log_life < 6", 4.0, 6.0),
     ("log_life >= 6", 6.0, None),
 ]
+PHYSICAL_LIFE_BIN_DEFS: List[Tuple[str, Optional[float], Optional[float]]] = list(BIN_DEFS)
+PHYSICAL_LIFE_BIN_ORDER: List[str] = [label for label, _, _ in PHYSICAL_LIFE_BIN_DEFS]
 ALL_LIFE_BIN_DEFS: List[Tuple[str, Optional[float], Optional[float]]] = [
     (FULL_TEST_SET_LABEL, None, None),
-    *BIN_DEFS,
+    *PHYSICAL_LIFE_BIN_DEFS,
 ]
 
 
-def loglife_bin_metrics(node_df: pd.DataFrame) -> pd.DataFrame:
+def life_bin_metrics_by_groups(
+    node_df: pd.DataFrame,
+    group_cols: Sequence[str],
+    include_full_set: bool = True,
+) -> pd.DataFrame:
     if node_df.empty:
-        return pd.DataFrame()
+        return pd.DataFrame(columns=list(group_cols) + ["life_bin", "n_samples", "mae_loglife", "rmse_loglife", "unstable"])
+    bin_defs: List[Tuple[str, Optional[float], Optional[float]]] = (
+        ALL_LIFE_BIN_DEFS if include_full_set else PHYSICAL_LIFE_BIN_DEFS
+    )
     records: List[Dict[str, Any]] = []
-    for keys, g in node_df.groupby(GROUP_COLS):
-        regime, ablation, model_family = keys
+    for keys, g in node_df.groupby(list(group_cols), dropna=False):
+        if not isinstance(keys, tuple):
+            keys = (keys,)
+        base = dict(zip(group_cols, keys))
         t_all = g["true_loglife"].to_numpy()
         p_all = g["pred_loglife"].to_numpy()
-        for bin_name, lo, hi in ALL_LIFE_BIN_DEFS:
+        for bin_name, lo, hi in bin_defs:
             mask = np.ones_like(t_all, dtype=bool)
             if lo is not None:
                 mask &= (t_all >= lo)
@@ -149,7 +160,7 @@ def loglife_bin_metrics(node_df: pd.DataFrame) -> pd.DataFrame:
             signed_mean_error_loglife = float(np.mean(err)) if n else np.nan
             median_abs_error_loglife = float(np.median(np.abs(err))) if n else np.nan
             records.append({
-                "regime": regime, "ablation": ablation, "model_family": model_family,
+                **base,
                 "life_bin": bin_name, "bin": bin_name,
                 "n_samples": n, "n_nodes": n,
                 "mae_loglife": mae_loglife,
@@ -163,6 +174,56 @@ def loglife_bin_metrics(node_df: pd.DataFrame) -> pd.DataFrame:
                 "unstable": bool(unstable),
             })
     return pd.DataFrame(records)
+
+
+def loglife_bin_metrics(node_df: pd.DataFrame) -> pd.DataFrame:
+    return life_bin_metrics_by_groups(node_df, GROUP_COLS, include_full_set=True)
+
+
+def split_life_bin_metrics(
+    metrics_df: pd.DataFrame,
+    bin_col: str = "life_bin",
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    if metrics_df.empty or bin_col not in metrics_df.columns:
+        return metrics_df.iloc[0:0].copy(), metrics_df.iloc[0:0].copy()
+    per_bin_df = metrics_df[metrics_df[bin_col].isin(PHYSICAL_LIFE_BIN_ORDER)].copy()
+    full_set_df = metrics_df[metrics_df[bin_col].eq(FULL_TEST_SET_LABEL)].copy()
+    if not per_bin_df.empty:
+        per_bin_df[bin_col] = pd.Categorical(
+            per_bin_df[bin_col],
+            categories=PHYSICAL_LIFE_BIN_ORDER,
+            ordered=True,
+        )
+    return per_bin_df, full_set_df
+
+
+def assert_non_empty_plot_df(
+    plot_df: pd.DataFrame,
+    *,
+    intended_plot: str,
+    reference_df: Optional[pd.DataFrame] = None,
+    metric_cols: Sequence[str] = ("mae_loglife", "rmse_loglife"),
+) -> None:
+    if not plot_df.empty:
+        return
+    source = reference_df if reference_df is not None else plot_df
+    model_variants = sorted(source["model_family"].dropna().astype(str).unique().tolist()) if "model_family" in source.columns else []
+    training_fracs = []
+    if "training_fraction" in source.columns:
+        training_fracs = sorted(pd.to_numeric(source["training_fraction"], errors="coerce").dropna().unique().tolist())
+    life_bins = sorted(source["life_bin"].dropna().astype(str).unique().tolist()) if "life_bin" in source.columns else []
+    counts = (
+        source.groupby(["life_bin", "training_fraction"]).size().to_dict()
+        if all(c in source.columns for c in ["life_bin", "training_fraction"]) else {}
+    )
+    non_null = {c: int(source[c].notna().sum()) for c in metric_cols if c in source.columns}
+    raise ValueError(
+        f"No rows available for {intended_plot}. "
+        f"Report available model variants={model_variants}, "
+        f"training fractions={training_fracs}, life bins={life_bins}, "
+        f"row counts by life bin and training fraction={counts}, "
+        f"non-null metrics={non_null}."
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -505,24 +566,54 @@ def plot_zone_bar(zone_df: pd.DataFrame, title: str, out_dir: Optional[Path] = N
 def plot_bin_bar(bin_df: pd.DataFrame, title: str, out_dir: Optional[Path] = None, filename: Optional[str] = None):
     if bin_df.empty:
         return None
-    fig, axes = plt.subplots(1, 2, figsize=(13, 4.5))
-    bins = [b for b, _, _ in ALL_LIFE_BIN_DEFS]
+    bin_col = "life_bin" if "life_bin" in bin_df.columns else "bin"
+    per_bin_df, full_set_df = split_life_bin_metrics(bin_df, bin_col=bin_col)
+    if per_bin_df.empty and full_set_df.empty:
+        return None
     families = sorted(bin_df["model_family"].unique())
-    for ax, metric in zip(axes, ["MAE", "RMSE"]):
+    fig, axes = plt.subplots(2, 2, figsize=(15, 8), sharex="col")
+    for row_i, metric in enumerate(["MAE", "RMSE"]):
+        metric_col = metric if metric in bin_df.columns else metric.lower() + "_loglife"
+        full_ax = axes[row_i, 0]
+        per_bin_ax = axes[row_i, 1]
+        x_full = np.arange(len(families), dtype=float)
+        full_vals = []
+        for fam in families:
+            fam_full = full_set_df[full_set_df["model_family"] == fam]
+            full_vals.append(float(fam_full.iloc[0][metric_col]) if (not fam_full.empty and metric_col in fam_full.columns) else np.nan)
+        bars = full_ax.bar(x_full, full_vals)
+        for b_, fam in zip(bars, families):
+            fam_full = full_set_df[full_set_df["model_family"] == fam]
+            if not fam_full.empty and "n_samples" in fam_full.columns:
+                full_ax.text(
+                    b_.get_x() + b_.get_width() / 2,
+                    (b_.get_height() or 0),
+                    f"n={int(fam_full.iloc[0]['n_samples'])}",
+                    ha="center",
+                    va="bottom",
+                    fontsize=6,
+                    rotation=90,
+                )
+        full_ax.set_title(f"{metric}: {FULL_TEST_SET_LABEL}")
+        full_ax.set_ylabel(f"log_life {metric} (decades)")
+        full_ax.set_xticks(x_full)
+        full_ax.set_xticklabels(families, rotation=20, ha="right")
+        bins = PHYSICAL_LIFE_BIN_ORDER
         x = np.arange(len(bins), dtype=float)
         width = 0.8 / max(1, len(families))
         for i, fam in enumerate(families):
-            bin_col = "life_bin" if "life_bin" in bin_df.columns else "bin"
-            sub = bin_df[bin_df["model_family"] == fam].set_index(bin_col)
-            metric_col = metric if metric in sub.columns else metric.lower() + "_loglife"
+            sub = per_bin_df[per_bin_df["model_family"] == fam].set_index(bin_col)
             vals = [sub.loc[b, metric_col] if b in sub.index else np.nan for b in bins]
             unstable = [sub.loc[b, "unstable"] if b in sub.index else True for b in bins]
-            bars = ax.bar(x + (i - (len(families) - 1) / 2) * width, vals, width=width, label=fam)
+            bars = per_bin_ax.bar(x + (i - (len(families) - 1) / 2) * width, vals, width=width, label=fam)
             for b_, u in zip(bars, unstable):
                 if u:
-                    ax.text(b_.get_x() + b_.get_width() / 2, (b_.get_height() or 0), "unstable", ha="center", va="bottom", fontsize=6, color="red", rotation=90)
-        ax.set_xticks(x); ax.set_xticklabels(bins, rotation=20)
-        ax.set_ylabel(f"log_life {metric} (decades)"); ax.legend(fontsize=7)
+                    per_bin_ax.text(b_.get_x() + b_.get_width() / 2, (b_.get_height() or 0), "unstable", ha="center", va="bottom", fontsize=6, color="red", rotation=90)
+        per_bin_ax.set_xticks(x)
+        per_bin_ax.set_xticklabels(bins, rotation=20, ha="right")
+        per_bin_ax.set_ylabel(f"log_life {metric} (decades)")
+        per_bin_ax.set_title(f"{metric}: ordered physical life bins")
+        per_bin_ax.legend(fontsize=7)
     fig.suptitle(title)
     fig.tight_layout()
     if out_dir is not None and filename:

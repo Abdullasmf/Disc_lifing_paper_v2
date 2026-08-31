@@ -1,0 +1,18 @@
+{
+  "regime": "Zonal",
+  "hdf5_filename": "disc_dataset_edge_deriv_zonal.h5",
+  "geometry_family": "disc",
+  "total_geometry_count": 0,
+  "evaluation_geometry_count": 0,
+  "split_seed": 42,
+  "split_fraction": 0.2,
+  "training_sample_ids": [],
+  "evaluation_sample_ids": [],
+  "training_positional_indices": [],
+  "evaluation_positional_indices": [],
+  "timestamp_utc": "2026-08-31T19:40:59Z",
+  "notebook_commit_sha": "ddaee34d2731dcfd06546c32f62b0ec9d863f9bf",
+  "evaluation_label": "validation-split evaluation",
+  "dataset_available": false,
+  "independence_basis": "A deterministic geometry holdout is used, but checkpoint-selection independence is not proved."
+}

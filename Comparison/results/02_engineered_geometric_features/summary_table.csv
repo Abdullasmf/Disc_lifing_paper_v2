@@ -1,0 +1,4 @@
+evaluation_label,regime,ablation,model_family,n_samples_full_test
+validation-split evaluation,Zonal,Edge_arc_feat,ArGEnT_self_att_noSDF,0
+validation-split evaluation,Zonal,Edge_arc_feat,PointNetMLPJoint_headfeat,0
+validation-split evaluation,Zonal,Edge_arc_feat,PointNetMLPJoint_FP_headfeat,0

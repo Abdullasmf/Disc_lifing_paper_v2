@@ -1,0 +1,2 @@
+checkpoint_path,model_family,status,prediction_sample_ids_match_eval_split,n_evaluation_geometries
+,,dataset unavailable: /home/runner/work/Disc_lifing_paper_v2/Disc_lifing_paper_v2/Data_gen/output/disc_dataset_edge_deriv_zonal.h5,False,0

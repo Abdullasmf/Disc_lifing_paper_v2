@@ -1,0 +1,14 @@
+{
+  "commit_sha": "ddaee34d2731dcfd06546c32f62b0ec9d863f9bf",
+  "evaluation_label": "validation-split evaluation",
+  "results_dir": "/home/runner/work/Disc_lifing_paper_v2/Disc_lifing_paper_v2/Comparison/results/02_engineered_geometric_features",
+  "families": [
+    "ArGEnT_self_att_noSDF",
+    "PointNetMLPJoint_headfeat",
+    "PointNetMLPJoint_FP_headfeat"
+  ],
+  "argent_feature_authority": "Training_script.py INPUT_COLS/QUERY_COLS",
+  "quantitative_dataset": "/home/runner/work/Disc_lifing_paper_v2/Disc_lifing_paper_v2/Data_gen/output/disc_dataset_edge_deriv_zonal.h5",
+  "qualitative_example_dataset": "/home/runner/work/Disc_lifing_paper_v2/Disc_lifing_paper_v2/Comparison/Examples/disc_example_edge_deriv_zonal.h5",
+  "dataset_available": false
+}

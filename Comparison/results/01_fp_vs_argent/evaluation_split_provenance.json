@@ -10013,8 +10013,8 @@
       4996,
       4997
     ],
-    "timestamp_utc": "2026-08-25T12:21:24Z",
-    "notebook_commit_sha": "ae6197d15a5a23c99f72ca45fd14f3cfb8e66df5",
+    "timestamp_utc": "2026-09-01T12:22:15Z",
+    "notebook_commit_sha": "7c844bffb553985f439f49c8d69e0b46bdc6a61d",
     "evaluation_label": "validation-split evaluation",
     "independence_basis": "A new geometry holdout is not proved independent of model validation/checkpoint selection."
   },
@@ -20032,8 +20032,8 @@
       4996,
       4997
     ],
-    "timestamp_utc": "2026-08-25T12:21:29Z",
-    "notebook_commit_sha": "ae6197d15a5a23c99f72ca45fd14f3cfb8e66df5",
+    "timestamp_utc": "2026-09-01T12:22:20Z",
+    "notebook_commit_sha": "7c844bffb553985f439f49c8d69e0b46bdc6a61d",
     "evaluation_label": "validation-split evaluation",
     "independence_basis": "A new geometry holdout is not proved independent of model validation/checkpoint selection."
   }

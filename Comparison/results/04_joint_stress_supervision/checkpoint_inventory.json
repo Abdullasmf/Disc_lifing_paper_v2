@@ -6,11 +6,11 @@
     "model_family": "ArGEnT_self_att_noSDF",
     "variant_name": "argent_self_nosdf_s_177b264d",
     "fp_status": "non-FP",
-    "checkpoint_path": "/home/runner/work/Disc_lifing_paper_v2/Disc_lifing_paper_v2/Zonal/Edge/ArGEnT_self_att_noSDF/Trained_models/argent_self_nosdf_s_177b264d.pt",
+    "checkpoint_path": "c:\\Users\\abfat\\Desktop\\Disc_lifing_paper_v2\\Zonal\\Edge\\ArGEnT_self_att_noSDF\\Trained_models\\argent_self_nosdf_s_177b264d.pt",
     "file_size_bytes": 3459222,
     "sha256": "04d489d391f831a2f6e5605410590e7f08ae8345d1f633a9492c00a7ddb978a1",
     "training_scripts": [
-      "/home/runner/work/Disc_lifing_paper_v2/Disc_lifing_paper_v2/Zonal/Edge/ArGEnT_self_att_noSDF/Training_script.py"
+      "c:\\Users\\abfat\\Desktop\\Disc_lifing_paper_v2\\Zonal\\Edge\\ArGEnT_self_att_noSDF\\Training_script.py"
     ],
     "script_target_names": [
       "Stress",
@@ -83,13 +83,13 @@
     "model_family": "PointNetMLPJoint",
     "variant_name": "pn_s_full_ln_pos12_78193d0f",
     "fp_status": "non-FP",
-    "checkpoint_path": "/home/runner/work/Disc_lifing_paper_v2/Disc_lifing_paper_v2/Zonal/Edge/PointNetMLPJoint/Trained_models/pn_s_full_ln_pos12_78193d0f.pt",
+    "checkpoint_path": "c:\\Users\\abfat\\Desktop\\Disc_lifing_paper_v2\\Zonal\\Edge\\PointNetMLPJoint\\Trained_models\\pn_s_full_ln_pos12_78193d0f.pt",
     "file_size_bytes": 2965098,
     "sha256": "e155d55a22d9ef9055c3d3b62b1a1d199bb02f17946b5bba94da36c9c8ab4800",
     "training_scripts": [
-      "/home/runner/work/Disc_lifing_paper_v2/Disc_lifing_paper_v2/Zonal/Edge/PointNetMLPJoint/Training_script.py",
-      "/home/runner/work/Disc_lifing_paper_v2/Disc_lifing_paper_v2/Zonal/Edge/PointNetMLPJoint/Training_script_L1.py",
-      "/home/runner/work/Disc_lifing_paper_v2/Disc_lifing_paper_v2/Zonal/Edge/PointNetMLPJoint/Training_script_weighted.py"
+      "c:\\Users\\abfat\\Desktop\\Disc_lifing_paper_v2\\Zonal\\Edge\\PointNetMLPJoint\\Training_script.py",
+      "c:\\Users\\abfat\\Desktop\\Disc_lifing_paper_v2\\Zonal\\Edge\\PointNetMLPJoint\\Training_script_L1.py",
+      "c:\\Users\\abfat\\Desktop\\Disc_lifing_paper_v2\\Zonal\\Edge\\PointNetMLPJoint\\Training_script_weighted.py"
     ],
     "script_target_names": [
       "Stress",
@@ -201,12 +201,12 @@
     "model_family": "PointNetMLPJoint_FP",
     "variant_name": "pnmlp_16932d84",
     "fp_status": "FP",
-    "checkpoint_path": "/home/runner/work/Disc_lifing_paper_v2/Disc_lifing_paper_v2/Zonal/Edge/PointNetMLPJoint_FP/Trained_models/pnmlp_16932d84.pt",
+    "checkpoint_path": "c:\\Users\\abfat\\Desktop\\Disc_lifing_paper_v2\\Zonal\\Edge\\PointNetMLPJoint_FP\\Trained_models\\pnmlp_16932d84.pt",
     "file_size_bytes": 3098274,
     "sha256": "5a4051f09936adfe3f233fa3cea2405015372d7f2ddab32bf9804797d750bbab",
     "training_scripts": [
-      "/home/runner/work/Disc_lifing_paper_v2/Disc_lifing_paper_v2/Zonal/Edge/PointNetMLPJoint_FP/Training_script.py",
-      "/home/runner/work/Disc_lifing_paper_v2/Disc_lifing_paper_v2/Zonal/Edge/PointNetMLPJoint_FP/Training_script_L1.py"
+      "c:\\Users\\abfat\\Desktop\\Disc_lifing_paper_v2\\Zonal\\Edge\\PointNetMLPJoint_FP\\Training_script.py",
+      "c:\\Users\\abfat\\Desktop\\Disc_lifing_paper_v2\\Zonal\\Edge\\PointNetMLPJoint_FP\\Training_script_L1.py"
     ],
     "script_target_names": [
       "Stress",
@@ -321,11 +321,11 @@
     "model_family": "PointNetMLPJoint_weighted",
     "variant_name": "pn_s_full_ln_pos12_78193d0f",
     "fp_status": "non-FP",
-    "checkpoint_path": "/home/runner/work/Disc_lifing_paper_v2/Disc_lifing_paper_v2/Zonal/Edge/PointNetMLPJoint_weighted/Trained_models/pn_s_full_ln_pos12_78193d0f.pt",
+    "checkpoint_path": "c:\\Users\\abfat\\Desktop\\Disc_lifing_paper_v2\\Zonal\\Edge\\PointNetMLPJoint_weighted\\Trained_models\\pn_s_full_ln_pos12_78193d0f.pt",
     "file_size_bytes": 2967530,
     "sha256": "2fc9476d3acb08b12b3df6876fc71149bce1e5f1d5e46a2c61cb9e9f76b43733",
     "training_scripts": [
-      "/home/runner/work/Disc_lifing_paper_v2/Disc_lifing_paper_v2/Zonal/Edge/PointNetMLPJoint_weighted/Training_script_weighted.py"
+      "c:\\Users\\abfat\\Desktop\\Disc_lifing_paper_v2\\Zonal\\Edge\\PointNetMLPJoint_weighted\\Training_script_weighted.py"
     ],
     "script_target_names": [
       "Stress",
@@ -437,11 +437,11 @@
     "model_family": "ArGEnT_self_att_noSDF",
     "variant_name": "argent_self_nosdf_s_cf025919",
     "fp_status": "non-FP",
-    "checkpoint_path": "/home/runner/work/Disc_lifing_paper_v2/Disc_lifing_paper_v2/Zonal/Edge_no_stress/ArGEnT_self_att_noSDF/Trained_models/argent_self_nosdf_s_cf025919.pt",
+    "checkpoint_path": "c:\\Users\\abfat\\Desktop\\Disc_lifing_paper_v2\\Zonal\\Edge_no_stress\\ArGEnT_self_att_noSDF\\Trained_models\\argent_self_nosdf_s_cf025919.pt",
     "file_size_bytes": 3490454,
     "sha256": "ff47e060da979954e62d43bfcb8f03e1ccf528d4d71f814b3574d2633f9e139e",
     "training_scripts": [
-      "/home/runner/work/Disc_lifing_paper_v2/Disc_lifing_paper_v2/Zonal/Edge_no_stress/ArGEnT_self_att_noSDF/Training_script.py"
+      "c:\\Users\\abfat\\Desktop\\Disc_lifing_paper_v2\\Zonal\\Edge_no_stress\\ArGEnT_self_att_noSDF\\Training_script.py"
     ],
     "script_target_names": [
       "LogLife"
@@ -513,12 +513,12 @@
     "model_family": "PointNetMLPJoint_FP",
     "variant_name": "pnmlp_1bbaae12",
     "fp_status": "FP",
-    "checkpoint_path": "/home/runner/work/Disc_lifing_paper_v2/Disc_lifing_paper_v2/Zonal/Edge_no_stress/PointNetMLPJoint_FP/Trained_models/pnmlp_1bbaae12.pt",
+    "checkpoint_path": "c:\\Users\\abfat\\Desktop\\Disc_lifing_paper_v2\\Zonal\\Edge_no_stress\\PointNetMLPJoint_FP\\Trained_models\\pnmlp_1bbaae12.pt",
     "file_size_bytes": 3081442,
     "sha256": "b9383a127a4a4657c463b6274ae92cf73a9b447445456a0cf6903192819e08c5",
     "training_scripts": [
-      "/home/runner/work/Disc_lifing_paper_v2/Disc_lifing_paper_v2/Zonal/Edge_no_stress/PointNetMLPJoint_FP/Training_script.py",
-      "/home/runner/work/Disc_lifing_paper_v2/Disc_lifing_paper_v2/Zonal/Edge_no_stress/PointNetMLPJoint_FP/Training_script_L1.py"
+      "c:\\Users\\abfat\\Desktop\\Disc_lifing_paper_v2\\Zonal\\Edge_no_stress\\PointNetMLPJoint_FP\\Training_script.py",
+      "c:\\Users\\abfat\\Desktop\\Disc_lifing_paper_v2\\Zonal\\Edge_no_stress\\PointNetMLPJoint_FP\\Training_script_L1.py"
     ],
     "script_target_names": [
       "LogLife"

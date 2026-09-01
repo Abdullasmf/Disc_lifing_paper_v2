@@ -1,12 +1,10 @@
 {
   "regime": "Zonal",
-  "ablation": "Edge_arc_feat",
   "dataset_path": "c:\\Users\\abfat\\Desktop\\Disc_lifing_paper_v2\\Data_gen\\output\\disc_dataset_edge_deriv_zonal.h5",
-  "dataset_available": true,
   "total_geometry_count": 5000,
-  "training_geometry_count": 4000,
+  "training_geometry_count_full": 4000,
   "evaluation_geometry_count": 1000,
-  "training_sample_ids": [
+  "training_sample_ids_full": [
     "0",
     "1",
     "2",
@@ -5013,7 +5011,6 @@
   "split_seed": 42,
   "split_fraction": 0.2,
   "evaluation_label": "validation-split evaluation",
-  "independence_basis": "A deterministic geometry holdout is used, but checkpoint-selection independence is not proved.",
-  "timestamp_utc": "2026-09-01T12:39:36Z",
+  "timestamp_utc": "2026-09-01T12:41:27Z",
   "notebook_commit_sha": "7c844bffb553985f439f49c8d69e0b46bdc6a61d"
 }

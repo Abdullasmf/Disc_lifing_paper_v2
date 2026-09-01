@@ -1,8 +1,8 @@
 {
-  "commit_sha": "ddaee34d2731dcfd06546c32f62b0ec9d863f9bf",
+  "commit_sha": "7c844bffb553985f439f49c8d69e0b46bdc6a61d",
   "evaluation_label": "validation-split evaluation",
-  "results_dir": "/home/runner/work/Disc_lifing_paper_v2/Disc_lifing_paper_v2/Comparison/results/04_joint_stress_supervision",
-  "dataset_available": false,
+  "results_dir": "c:\\Users\\abfat\\Desktop\\Disc_lifing_paper_v2\\Comparison\\results\\04_joint_stress_supervision",
+  "dataset_available": true,
   "valid_pair_ids": [
     "ArGEnT_self_att_noSDF__ca5324d5b4e306c2",
     "PointNetMLPJoint_FP__15c46d5f9f6e469b"

@@ -54,7 +54,7 @@ ENV/
 *.txt
 
 *.xlsx
-*.csv
+
 
 # Generated dataset artifacts (regenerable outputs, not source/provenance)
 *.png
@@ -76,7 +76,4 @@ Expressions.xls
 *.bak
 *.sha256
 
-Data_gen/output/checksums.sha256
-Data_gen/output/rim_load_validation/
-.nfs00000024804e2fd40000000e
-Data_gen/generation_steps.pdf
+

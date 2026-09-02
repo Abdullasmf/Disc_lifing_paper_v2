@@ -43,16 +43,18 @@ GROUP_COLS = ["regime", "ablation", "model_family"]
 # Internal model-family identifiers are intentionally kept separate from the
 # names used in paper figures and notebook display tables.
 DISPLAY_MODEL_NAMES: Dict[str, str] = {
-    "PointNetMLPJoint_FP": "LC-PointNet",
     "PointNetMLPJoint": "GC-PointNet",
-    "PointNetMLPJoint_FP_headfeat": "LC-PointNet + EF",
-    "ArGEnT_self_att_noSDF": "Adapted ArGEnT-inspired attention operator",
+    "PointNetMLPJoint_headfeat": "GC-PointNet + GF",
+    "PointNetMLPJoint_FP": "LC-PointNet",
+    "PointNetMLPJoint_FP_headfeat": "LC-PointNet + GF",
+    "ArGEnT_self_att_noSDF": "ArGEnT-A",
 }
 DISPLAY_MODEL_ORDER: List[str] = [
-    "LC-PointNet",
     "GC-PointNet",
-    "LC-PointNet + EF",
-    "Adapted ArGEnT-inspired attention operator",
+    "GC-PointNet + GF",
+    "LC-PointNet",
+    "LC-PointNet + GF",
+    "ArGEnT-A",
 ]
 
 
@@ -508,7 +510,7 @@ def plot_field_comparison(geom_nodes_by_model: Dict[str, pd.DataFrame], field_tr
 
         ax = axes[0, j]
         sc = ax.scatter(x, r, c=t, vmin=vmin, vmax=vmax, cmap="viridis", s=10)
-        ax.set_title(f"{m}\nTrue"); fig.colorbar(sc, ax=ax)
+        ax.set_title(f"{display_model_name(m)}\nTrue"); fig.colorbar(sc, ax=ax)
 
         ax = axes[1, j]
         sc = ax.scatter(x, r, c=p, vmin=vmin, vmax=vmax, cmap="viridis", s=10)

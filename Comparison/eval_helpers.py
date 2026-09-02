@@ -40,6 +40,49 @@ MIN_ZONE_NODES = 20
 
 GROUP_COLS = ["regime", "ablation", "model_family"]
 
+# Internal model-family identifiers are intentionally kept separate from the
+# names used in paper figures and notebook display tables.
+DISPLAY_MODEL_NAMES: Dict[str, str] = {
+    "PointNetMLPJoint_FP": "LC-PointNet",
+    "PointNetMLPJoint": "GC-PointNet",
+    "PointNetMLPJoint_FP_headfeat": "LC-PointNet + EF",
+    "ArGEnT_self_att_noSDF": "Adapted ArGEnT-inspired attention operator",
+}
+DISPLAY_MODEL_ORDER: List[str] = [
+    "LC-PointNet",
+    "GC-PointNet",
+    "LC-PointNet + EF",
+    "Adapted ArGEnT-inspired attention operator",
+]
+
+
+def display_model_name(model_family: str) -> str:
+    """Return the paper-facing name without changing an internal identifier."""
+    return DISPLAY_MODEL_NAMES.get(str(model_family), str(model_family))
+
+
+def ordered_model_families(families: Sequence[str]) -> List[str]:
+    """Order internal identifiers by their paper-facing model names."""
+    return sorted(
+        families,
+        key=lambda family: (
+            DISPLAY_MODEL_ORDER.index(display_model_name(family))
+            if display_model_name(family) in DISPLAY_MODEL_ORDER
+            else len(DISPLAY_MODEL_ORDER),
+            display_model_name(family),
+        ),
+    )
+
+
+def presentation_table(df: pd.DataFrame) -> pd.DataFrame:
+    """Copy a result table and substitute display names only for notebook output."""
+    display_df = df.copy()
+    for column in ("model_family", "left_family", "right_family",
+                   "model_family_baseline", "model_family_ablation"):
+        if column in display_df:
+            display_df[column] = display_df[column].map(display_model_name)
+    return display_df
+
 
 # ---------------------------------------------------------------------------
 # Pooled metrics (reproduces the notebook's original pooled-metric behaviour)
@@ -512,9 +555,10 @@ def plot_arc_length_error(geom_nodes_by_model: Dict[str, pd.DataFrame], title_pr
         if d["arc_length_mm"].isna().all():
             continue
         s = d["arc_length_mm"].to_numpy()
-        axes[0].plot(s, d["pred_stress"] - d["true_stress"], label=m, alpha=0.8)
-        axes[1].plot(s, d["pred_loglife"] - d["true_loglife"], label=m, alpha=0.8)
-        axes[2].plot(s, d["true_loglife"], label=m, alpha=0.8)
+        label = display_model_name(m)
+        axes[0].plot(s, d["pred_stress"] - d["true_stress"], label=label, alpha=0.8)
+        axes[1].plot(s, d["pred_loglife"] - d["true_loglife"], label=label, alpha=0.8)
+        axes[2].plot(s, d["true_loglife"], label=label, alpha=0.8)
 
     # zone boundaries from the first model's data (zones are geometry properties, model-independent)
     ref = geom_nodes_by_model[models[0]].sort_values("arc_length_mm")
@@ -543,20 +587,22 @@ def plot_zone_bar(zone_df: pd.DataFrame, title: str, out_dir: Optional[Path] = N
     d = d[d["status"] != "missing"]
     if d.empty:
         return None
-    fig, ax = plt.subplots(figsize=(11, 5))
+    fig, ax = plt.subplots(figsize=(13, 5))
     labels = sorted(d["subzone_name"].unique(), key=lambda z: PRINCIPAL_SUBZONES.index(z) if z in PRINCIPAL_SUBZONES else 99)
-    families = sorted(d["model_family"].unique())
+    families = ordered_model_families(d["model_family"].unique())
     x = np.arange(len(labels), dtype=float)
     width = 0.8 / max(1, len(families))
     for i, fam in enumerate(families):
         sub = d[d["model_family"] == fam].set_index("subzone_name")
         vals = [sub.loc[l, "MAE"] if l in sub.index else np.nan for l in labels]
         counts = [sub.loc[l, "n_nodes"] if l in sub.index else 0 for l in labels]
-        bars = ax.bar(x + (i - (len(families) - 1) / 2) * width, vals, width=width, label=fam)
+        bars = ax.bar(x + (i - (len(families) - 1) / 2) * width, vals, width=width,
+                      label=display_model_name(fam))
         for b, n in zip(bars, counts):
             ax.text(b.get_x() + b.get_width() / 2, (b.get_height() or 0), f"n={int(n)}", ha="center", va="bottom", fontsize=6, rotation=90)
     ax.set_xticks(x); ax.set_xticklabels(labels, rotation=30, ha="right")
-    ax.set_ylabel("LogLife MAE"); ax.set_title(title); ax.legend(fontsize=7)
+    ax.set_ylabel("LogLife MAE"); ax.set_title(title)
+    ax.legend(fontsize=7, loc="upper left", bbox_to_anchor=(1.01, 1))
     fig.tight_layout()
     if out_dir is not None and filename:
         _save_fig(fig, out_dir, filename)
@@ -570,8 +616,8 @@ def plot_bin_bar(bin_df: pd.DataFrame, title: str, out_dir: Optional[Path] = Non
     per_bin_df, full_set_df = split_life_bin_metrics(bin_df, bin_col=bin_col)
     if per_bin_df.empty and full_set_df.empty:
         return None
-    families = sorted(bin_df["model_family"].unique())
-    fig, axes = plt.subplots(2, 2, figsize=(15, 8), sharex="col")
+    families = ordered_model_families(bin_df["model_family"].unique())
+    fig, axes = plt.subplots(2, 2, figsize=(18, 8), sharex="col")
     for row_i, metric in enumerate(["MAE", "RMSE"]):
         metric_col = metric if metric in bin_df.columns else metric.lower() + "_loglife"
         full_ax = axes[row_i, 0]
@@ -597,7 +643,7 @@ def plot_bin_bar(bin_df: pd.DataFrame, title: str, out_dir: Optional[Path] = Non
         full_ax.set_title(f"{metric}: {FULL_TEST_SET_LABEL}")
         full_ax.set_ylabel(f"log_life {metric} (decades)")
         full_ax.set_xticks(x_full)
-        full_ax.set_xticklabels(families, rotation=20, ha="right")
+        full_ax.set_xticklabels([display_model_name(fam) for fam in families], rotation=20, ha="right")
         bins = PHYSICAL_LIFE_BIN_ORDER
         x = np.arange(len(bins), dtype=float)
         width = 0.8 / max(1, len(families))
@@ -605,7 +651,8 @@ def plot_bin_bar(bin_df: pd.DataFrame, title: str, out_dir: Optional[Path] = Non
             sub = per_bin_df[per_bin_df["model_family"] == fam].set_index(bin_col)
             vals = [sub.loc[b, metric_col] if b in sub.index else np.nan for b in bins]
             unstable = [sub.loc[b, "unstable"] if b in sub.index else True for b in bins]
-            bars = per_bin_ax.bar(x + (i - (len(families) - 1) / 2) * width, vals, width=width, label=fam)
+            bars = per_bin_ax.bar(x + (i - (len(families) - 1) / 2) * width, vals, width=width,
+                                  label=display_model_name(fam))
             for b_, u in zip(bars, unstable):
                 if u:
                     per_bin_ax.text(b_.get_x() + b_.get_width() / 2, (b_.get_height() or 0), "unstable", ha="center", va="bottom", fontsize=6, color="red", rotation=90)
@@ -613,7 +660,7 @@ def plot_bin_bar(bin_df: pd.DataFrame, title: str, out_dir: Optional[Path] = Non
         per_bin_ax.set_xticklabels(bins, rotation=20, ha="right")
         per_bin_ax.set_ylabel(f"log_life {metric} (decades)")
         per_bin_ax.set_title(f"{metric}: ordered physical life bins")
-        per_bin_ax.legend(fontsize=7)
+        per_bin_ax.legend(fontsize=7, loc="upper left", bbox_to_anchor=(1.01, 1))
     fig.suptitle(title)
     fig.tight_layout()
     if out_dir is not None and filename:
@@ -623,12 +670,13 @@ def plot_bin_bar(bin_df: pd.DataFrame, title: str, out_dir: Optional[Path] = Non
 
 def plot_geometry_scatter(geom_df: pd.DataFrame, out_dir: Optional[Path] = None, filename_prefix: Optional[str] = None):
     figs = []
-    families = sorted(geom_df["model_family"].unique())
+    families = ordered_model_families(geom_df["model_family"].unique())
 
     fig, ax = plt.subplots(figsize=(6, 6))
     for fam in families:
         d = geom_df[geom_df["model_family"] == fam]
-        ax.scatter(d["true_min_loglife"], d["pred_min_loglife"], s=14, alpha=0.6, label=fam)
+        ax.scatter(d["true_min_loglife"], d["pred_min_loglife"], s=14, alpha=0.6,
+                   label=display_model_name(fam))
     lims = [geom_df["true_min_loglife"].min(), geom_df["true_min_loglife"].max()]
     ax.plot(lims, lims, "k--", lw=1)
     ax.set_xlabel("True minimum LogLife"); ax.set_ylabel("Predicted minimum LogLife")
@@ -640,7 +688,8 @@ def plot_geometry_scatter(geom_df: pd.DataFrame, out_dir: Optional[Path] = None,
     fig, ax = plt.subplots(figsize=(6, 6))
     for fam in families:
         d = geom_df[geom_df["model_family"] == fam]
-        ax.scatter(d["true_max_stress"], d["pred_max_stress"], s=14, alpha=0.6, label=fam)
+        ax.scatter(d["true_max_stress"], d["pred_max_stress"], s=14, alpha=0.6,
+                   label=display_model_name(fam))
     lims = [geom_df["true_max_stress"].min(), geom_df["true_max_stress"].max()]
     ax.plot(lims, lims, "k--", lw=1)
     ax.set_xlabel("True maximum stress (MPa)"); ax.set_ylabel("Predicted maximum stress (MPa)")
@@ -652,7 +701,7 @@ def plot_geometry_scatter(geom_df: pd.DataFrame, out_dir: Optional[Path] = None,
     fig, ax = plt.subplots(figsize=(7, 5))
     for fam in families:
         d = geom_df[geom_df["model_family"] == fam]
-        ax.hist(d["min_loglife_error_decades"], bins=20, alpha=0.5, label=fam)
+        ax.hist(d["min_loglife_error_decades"], bins=20, alpha=0.5, label=display_model_name(fam))
     ax.set_xlabel("Per-geometry min-LogLife error (decades)"); ax.set_ylabel("Count")
     ax.legend(fontsize=7); ax.axvline(0, color="k", lw=0.8); fig.tight_layout()
     if out_dir is not None and filename_prefix:
@@ -669,12 +718,14 @@ def plot_geometry_error_distributions(
 ):
     if geom_df.empty:
         return None
-    families = sorted(geom_df["model_family"].unique())
+    families = ordered_model_families(geom_df["model_family"].unique())
     fig, axes = plt.subplots(1, 2, figsize=(12, 4.5))
     for fam in families:
         d = geom_df[geom_df["model_family"] == fam]
-        axes[0].hist(d["whole_geometry_loglife_mae"], bins=20, alpha=0.45, label=fam)
-        axes[1].hist(d["abs_min_loglife_error_decades"], bins=20, alpha=0.45, label=fam)
+        axes[0].hist(d["whole_geometry_loglife_mae"], bins=20, alpha=0.45,
+                     label=display_model_name(fam))
+        axes[1].hist(d["abs_min_loglife_error_decades"], bins=20, alpha=0.45,
+                     label=display_model_name(fam))
     axes[0].set_title("A. Per-geometry whole-field LogLife MAE")
     axes[0].set_xlabel("MAE (decades)")
     axes[0].set_ylabel("Count")

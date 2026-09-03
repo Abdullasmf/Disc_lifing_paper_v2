@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
@@ -59,9 +60,69 @@ DISPLAY_MODEL_ORDER: List[str] = [
 ]
 
 
+class UnresolvedPublicationLabelError(ValueError):
+    """Raised when a plotted model has no verified paper-facing label.
+
+    This is intentionally a hard failure: silently falling back to a raw
+    ``model_family``/checkpoint identifier in a paper-facing figure is the
+    exact failure mode this module exists to prevent (see
+    ``resolve_publication_label`` docstring).
+    """
+
+
+def resolve_publication_label(
+    model_internal_id: str,
+    *,
+    geometric_features: Optional[bool] = None,
+    checkpoint_id: Optional[str] = None,
+) -> str:
+    """Single authoritative internal-id -> paper-facing label resolver.
+
+    Every paper-facing plotting function/notebook cell must call this
+    resolver (directly or via :func:`display_model_name`) instead of typing
+    a label by hand or falling back to a raw identifier. It never silently
+    returns a raw id: an unresolved identity raises
+    :class:`UnresolvedPublicationLabelError` and stops figure generation.
+
+    Parameters
+    ----------
+    model_internal_id:
+        The verified, unmodified ``model_family`` value from the results
+        DataFrame/checkpoint metadata (never renamed on disk).
+    geometric_features:
+        Set ``True``/``False`` only when the caller has verified, from the
+        loaded checkpoint's own configuration (e.g. ``extra_feat_cols`` /
+        ``Training_script.py`` ``INPUT_COLS``), whether *this specific*
+        checkpoint consumes engineered geometric features. This is required
+        for ``ArGEnT_self_att_noSDF``, whose engineered-feature status is
+        ablation-directory dependent (the same family id is used for both
+        the plain and GF-augmented ArGEnT-A checkpoints). It is ignored for
+        the PointNet families, whose GF status is already encoded in the
+        family id itself (``*_headfeat`` suffix).
+    checkpoint_id:
+        Optional checkpoint path/identifier, included only in the error
+        message to help diagnose an unresolved mapping.
+    """
+    base = DISPLAY_MODEL_NAMES.get(str(model_internal_id))
+    if base is None:
+        raise UnresolvedPublicationLabelError(
+            "Unresolved publication label for a plotted model. "
+            f"model_internal_id={model_internal_id!r}, checkpoint_id={checkpoint_id!r}. "
+            f"Known verified identities: {sorted(DISPLAY_MODEL_NAMES)}. "
+            "Add a verified mapping to DISPLAY_MODEL_NAMES instead of falling back "
+            "to the raw identifier in a paper-facing figure."
+        )
+    if str(model_internal_id) == "ArGEnT_self_att_noSDF" and geometric_features:
+        return f"{base} + GF"
+    return base
+
+
 def display_model_name(model_family: str) -> str:
-    """Return the paper-facing name without changing an internal identifier."""
-    return DISPLAY_MODEL_NAMES.get(str(model_family), str(model_family))
+    """Strict paper-facing name resolver (thin wrapper over
+    :func:`resolve_publication_label`) that never changes an internal
+    identifier and never silently falls back to it either.
+    """
+    return resolve_publication_label(model_family)
 
 
 def ordered_model_families(families: Sequence[str]) -> List[str]:
@@ -75,6 +136,41 @@ def ordered_model_families(families: Sequence[str]) -> List[str]:
             display_model_name(family),
         ),
     )
+
+
+# Alias kept for readability at call sites that only need publication
+# ordering (identical behaviour to ``ordered_model_families``).
+apply_publication_model_order = ordered_model_families
+
+
+SUPERVISION_MODE_LABELS: Dict[str, str] = {
+    "joint": "joint stress–life",
+    "life_only": "life only",
+}
+
+
+def format_supervision_label(publication_label: str, stress_supervision_mode: str) -> str:
+    """Append a verified supervision condition to a publication model label.
+
+    ``stress_supervision_mode`` must be ``"joint"`` (joint stress + log-life
+    supervision) or ``"life_only"`` (log-life-only supervision). Never pass
+    a checkpoint id or raw folder name here.
+    """
+    if stress_supervision_mode not in SUPERVISION_MODE_LABELS:
+        raise ValueError(
+            f"Unknown stress_supervision_mode={stress_supervision_mode!r}; "
+            f"expected one of {sorted(SUPERVISION_MODE_LABELS)}"
+        )
+    return f"{publication_label} ({SUPERVISION_MODE_LABELS[stress_supervision_mode]})"
+
+
+def format_gf_delta_label(gf_publication_label: str, base_publication_label: str) -> str:
+    """Build an explicit ``"<+GF label> − <base label>"`` delta label.
+
+    Use this for every engineered-geometric-feature delta plot instead of
+    typing ``headfeat − baseline``/``EF − baseline`` by hand.
+    """
+    return f"{gf_publication_label} \u2212 {base_publication_label}"
 
 
 def presentation_table(df: pd.DataFrame, label_fn: Optional[Any] = None) -> pd.DataFrame:
@@ -481,7 +577,162 @@ def paired_argent_fp_diff(geom_df: pd.DataFrame,
 # Plotting
 # ---------------------------------------------------------------------------
 
+# Raw tokens that must never survive into a paper-facing figure. Matched
+# case-insensitively as substrings, except ``EF`` which is matched as a
+# case-sensitive standalone token (see ``_EF_TOKEN_PATTERN``) so that it does
+# not spuriously fire on ordinary English words.
+PROHIBITED_PUBLICATION_TOKENS: List[str] = [
+    "pnmlp_",
+    "argent_self_",
+    "pointnetmlpjoint_fp_headfeat",
+    "pointnetmlpjoint_headfeat",
+    "pointnetmlpjoint_fp",
+    "pointnetmlpjoint",
+    "pointnetfp",
+    "headfeat",
+    "adapted argent-inspired attention operator",
+    "argent_self_att_nosdf",
+    "with stress",
+    "no stress",
+    "with-stress",
+    "no-stress",
+    "baseline",
+    "regular",
+    "_arc_feat",
+]
+_EF_TOKEN_PATTERN = re.compile(r"(?<![A-Za-z])EF(?![A-Za-z])")
+
+
+def _iter_figure_text(fig) -> List[Tuple[str, str]]:
+    """Collect ``(text, location)`` pairs for every visible text element."""
+    found: List[Tuple[str, str]] = []
+
+    def _add(value: Optional[str], location: str) -> None:
+        if value:
+            found.append((str(value), location))
+
+    suptitle = getattr(fig, "_suptitle", None)
+    _add(suptitle.get_text() if suptitle is not None else None, "figure.suptitle")
+
+    for ax_idx, ax in enumerate(fig.get_axes()):
+        _add(ax.get_title(), f"axes[{ax_idx}].title")
+        _add(ax.get_xlabel(), f"axes[{ax_idx}].xlabel")
+        _add(ax.get_ylabel(), f"axes[{ax_idx}].ylabel")
+        for tick in ax.get_xticklabels():
+            _add(tick.get_text(), f"axes[{ax_idx}].xticklabel")
+        for tick in ax.get_yticklabels():
+            _add(tick.get_text(), f"axes[{ax_idx}].yticklabel")
+        legend = ax.get_legend()
+        if legend is not None:
+            for text in legend.get_texts():
+                _add(text.get_text(), f"axes[{ax_idx}].legend")
+        for text in ax.texts:
+            _add(text.get_text(), f"axes[{ax_idx}].annotation")
+
+    for leg_idx, legend in enumerate(getattr(fig, "legends", []) or []):
+        for text in legend.get_texts():
+            _add(text.get_text(), f"figure.legend[{leg_idx}]")
+
+    return found
+
+
+def validate_no_raw_publication_labels(fig, *, context: str = "") -> None:
+    """Fail figure generation if any visible text contains a raw/internal token.
+
+    Inspects the figure suptitle, every axes title/x-y label/tick label/
+    legend/annotation, and any figure-level legends. Raises ``ValueError``
+    (rather than silently saving) so a figure can never reach the paper with
+    a checkpoint hash, ``headfeat``, ``EF``, ``with/no stress``, etc.
+    """
+    offenders: List[Tuple[str, str, str]] = []
+    for text, location in _iter_figure_text(fig):
+        lowered = text.lower()
+        for token in PROHIBITED_PUBLICATION_TOKENS:
+            if token in lowered:
+                offenders.append((text, location, token))
+        if _EF_TOKEN_PATTERN.search(text):
+            offenders.append((text, location, "EF"))
+    if offenders:
+        header = "Prohibited raw token found in paper-facing figure"
+        if context:
+            header += f" ({context})"
+        lines = [header + ":"]
+        for text, location, token in offenders:
+            lines.append(f"  - text={text!r} location={location} matched_token={token!r}")
+        lines.append(
+            "Use resolve_publication_label()/format_supervision_label()/"
+            "format_gf_delta_label() to build reader-facing text instead."
+        )
+        raise ValueError("\n".join(lines))
+
+
+def make_wrapped_life_bin_grid(
+    n_panels: int,
+    ncols: int = 2,
+    panel_width: float = 6.5,
+    panel_height: float = 4.5,
+    **subplot_kwargs: Any,
+):
+    """Create a compact ``ncols``-wide wrapped grid for per-life-bin panels.
+
+    Unused trailing axes (when ``n_panels`` does not evenly fill the grid)
+    are hidden, not left visually empty. Panels must be filled in reading
+    order (left to right, then top to bottom) by the caller so ordered
+    physical life bins stay ordered low-to-high log-life.
+
+    Returns ``(fig, active_axes, all_axes_flat)`` where ``active_axes`` has
+    exactly ``n_panels`` entries to plot into and ``all_axes_flat`` includes
+    the hidden ones (useful for ``add_external_figure_legend``, which only
+    reads legend handles from currently-visible axes anyway).
+    """
+    nrows = math.ceil(n_panels / ncols)
+    fig, axes = plt.subplots(
+        nrows=nrows,
+        ncols=ncols,
+        figsize=(panel_width * ncols, panel_height * nrows),
+        **subplot_kwargs,
+    )
+    axes_flat = np.atleast_1d(axes).ravel()
+    for ax in axes_flat[n_panels:]:
+        ax.set_visible(False)
+    return fig, axes_flat[:n_panels], axes_flat
+
+
+def add_external_figure_legend(
+    fig,
+    axes,
+    *,
+    title: Optional[str] = None,
+    bbox_to_anchor: Tuple[float, float] = (1.01, 0.5),
+    loc: str = "center left",
+):
+    """Add one deduplicated figure-level legend outside the plotting grid.
+
+    Reads handles/labels from every visible axes, de-duplicates by label
+    (so a series repeated across panels appears once), and places the
+    legend outside the axes so it never overlaps the suptitle, a subplot
+    title, or plotted data. Callers must reserve legend space, e.g. via
+    ``fig.tight_layout(rect=(0.0, 0.0, 0.82, 0.93))``.
+    """
+    axes_list = [ax for ax in np.atleast_1d(axes).ravel().tolist() if ax is not None and ax.get_visible()]
+    handles: List[Any] = []
+    labels: List[str] = []
+    seen = set()
+    for ax in axes_list:
+        h_list, l_list = ax.get_legend_handles_labels()
+        for handle, label in zip(h_list, l_list):
+            if label in seen:
+                continue
+            seen.add(label)
+            handles.append(handle)
+            labels.append(label)
+    if not handles:
+        return None
+    return fig.legend(handles, labels, loc=loc, bbox_to_anchor=bbox_to_anchor, frameon=True, title=title)
+
+
 def _save_fig(fig, out_dir: Path, name: str) -> None:
+    validate_no_raw_publication_labels(fig, context=name)
     out_dir.mkdir(parents=True, exist_ok=True)
     fig.savefig(out_dir / f"{name}.png", dpi=150, bbox_inches="tight")
     try:
@@ -601,7 +852,10 @@ def plot_arc_length_error(geom_nodes_by_model: Dict[str, pd.DataFrame], title_pr
     return fig
 
 
-def plot_zone_bar(zone_df: pd.DataFrame, title: str, out_dir: Optional[Path] = None, filename: Optional[str] = None):
+def plot_zone_bar(zone_df: pd.DataFrame, title: str, out_dir: Optional[Path] = None, filename: Optional[str] = None,
+                   label_fn: Optional[Any] = None):
+    """``label_fn`` defaults to the module-level :func:`display_model_name`."""
+    resolve_label = label_fn if label_fn is not None else display_model_name
     d = zone_df.copy()
     d = d[d["status"] != "missing"]
     if d.empty:
@@ -616,7 +870,7 @@ def plot_zone_bar(zone_df: pd.DataFrame, title: str, out_dir: Optional[Path] = N
         vals = [sub.loc[l, "MAE"] if l in sub.index else np.nan for l in labels]
         counts = [sub.loc[l, "n_nodes"] if l in sub.index else 0 for l in labels]
         bars = ax.bar(x + (i - (len(families) - 1) / 2) * width, vals, width=width,
-                      label=display_model_name(fam))
+                      label=resolve_label(fam))
         for b, n in zip(bars, counts):
             ax.text(b.get_x() + b.get_width() / 2, (b.get_height() or 0), f"n={int(n)}", ha="center", va="bottom", fontsize=6, rotation=90)
     ax.set_xticks(x); ax.set_xticklabels(labels, rotation=30, ha="right")
@@ -628,7 +882,17 @@ def plot_zone_bar(zone_df: pd.DataFrame, title: str, out_dir: Optional[Path] = N
     return fig
 
 
-def plot_bin_bar(bin_df: pd.DataFrame, title: str, out_dir: Optional[Path] = None, filename: Optional[str] = None):
+def plot_bin_bar(bin_df: pd.DataFrame, title: str, out_dir: Optional[Path] = None, filename: Optional[str] = None,
+                  label_fn: Optional[Any] = None):
+    """``label_fn`` defaults to the module-level :func:`display_model_name`.
+
+    Pass a notebook-local resolver (built on top of
+    :func:`resolve_publication_label`) when a raw ``model_family`` id in this
+    call needs a notebook-specific verified label, e.g. an ArGEnT checkpoint
+    that is engineered-feature-augmented in this notebook's ablation
+    directory but not in another notebook's.
+    """
+    resolve_label = label_fn if label_fn is not None else display_model_name
     if bin_df.empty:
         return None
     bin_col = "life_bin" if "life_bin" in bin_df.columns else "bin"
@@ -662,7 +926,7 @@ def plot_bin_bar(bin_df: pd.DataFrame, title: str, out_dir: Optional[Path] = Non
         full_ax.set_title(f"{metric}: {FULL_TEST_SET_LABEL}")
         full_ax.set_ylabel(f"log_life {metric} (decades)")
         full_ax.set_xticks(x_full)
-        full_ax.set_xticklabels([display_model_name(fam) for fam in families], rotation=20, ha="right")
+        full_ax.set_xticklabels([resolve_label(fam) for fam in families], rotation=20, ha="right")
         bins = PHYSICAL_LIFE_BIN_ORDER
         x = np.arange(len(bins), dtype=float)
         width = 0.8 / max(1, len(families))
@@ -671,7 +935,7 @@ def plot_bin_bar(bin_df: pd.DataFrame, title: str, out_dir: Optional[Path] = Non
             vals = [sub.loc[b, metric_col] if b in sub.index else np.nan for b in bins]
             unstable = [sub.loc[b, "unstable"] if b in sub.index else True for b in bins]
             bars = per_bin_ax.bar(x + (i - (len(families) - 1) / 2) * width, vals, width=width,
-                                  label=display_model_name(fam))
+                                  label=resolve_label(fam))
             for b_, u in zip(bars, unstable):
                 if u:
                     per_bin_ax.text(b_.get_x() + b_.get_width() / 2, (b_.get_height() or 0), "unstable", ha="center", va="bottom", fontsize=6, color="red", rotation=90)

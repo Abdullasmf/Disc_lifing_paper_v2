@@ -14,8 +14,9 @@ from __future__ import annotations
 import json
 import math
 import re
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Literal, Optional, Sequence, Tuple
 
 import numpy as np
 import pandas as pd
@@ -41,20 +42,87 @@ MIN_ZONE_NODES = 20
 
 GROUP_COLS = ["regime", "ablation", "model_family"]
 
-# Internal model-family identifiers are intentionally kept separate from the
-# names used in paper figures and notebook display tables.
+# ---------------------------------------------------------------------------
+# Structured publication-model identity
+# ---------------------------------------------------------------------------
+#
+# Internal model-family identifiers (and their checkpoint/hash aliases) are
+# intentionally kept separate from the names used in paper figures and
+# notebook display tables. Rather than a flat string-replacement table, each
+# verified internal id is decomposed into its architecture, engineered-
+# geometric-feature status, and training condition, then formatted centrally
+# by ``format_publication_model_label``. This keeps the mapping auditable
+# (one row per verified identity, see class docstring for evidence) and
+# prevents ad-hoc labels from being typed by hand at plotting call sites.
+
+
+@dataclass(frozen=True)
+class PublicationModelIdentity:
+    """Verified composition of a paper-facing model label.
+
+    Each field must be established from the model's own checkpoint/config
+    metadata (see ``resolve_publication_label`` docstring), never guessed
+    from the raw internal id alone.
+    """
+
+    architecture: Literal["GC-PointNet", "LC-PointNet", "ArGEnT-A"]
+    has_geometric_features: bool = False
+    training_condition: Literal["standard", "weighted_loss"] = "standard"
+    supervision: Literal["joint_stress_life", "life_only", "not_applicable"] = "not_applicable"
+
+
+def format_publication_model_label(identity: PublicationModelIdentity) -> str:
+    """Format a verified :class:`PublicationModelIdentity` into paper text."""
+    label = identity.architecture
+    if identity.has_geometric_features:
+        label += " + GF"
+    if identity.training_condition == "weighted_loss":
+        label += " (weighted loss)"
+    return label
+
+
+# Verified internal model-family id -> structured publication identity.
+#
+# Evidence for each entry (see notebook ``reconstruct``/``predict_dispatch``
+# helpers in 01_fp_vs_argent.ipynb, 02_engineered_geometric_features.ipynb,
+# 03_data_efficiency.ipynb, 04_joint_stress_supervision.ipynb):
+#   - "PointNetMLPJoint*" families are all built via ``pn.build_model_from_arch``
+#     (non-FP) or ``pn.build_fp_model_from_arch`` (FP), i.e. GC-PointNet vs
+#     LC-PointNet respectively; the ``_headfeat`` suffix is the only thing
+#     that switches on engineered-geometric-feature consumption.
+#   - "PointNetMLPJoint_weighted" is loaded with the exact same
+#     ``pn.build_model_from_arch`` path (no FP propagation, no engineered
+#     geometric features) as plain "PointNetMLPJoint" -- see the shared
+#     ``elif family in ('PointNetMLPJoint', 'PointNetMLPJoint_weighted', ...)``
+#     branch in every notebook's ``reconstruct``/model-build cell -- and only
+#     differs in its (weighted) training loss. It is therefore the GC-PointNet
+#     architecture trained with the weighted-loss ablation.
+#   - "ArGEnT_self_att_noSDF" is the ArGEnT-A architecture; its engineered-
+#     geometric-feature status is ablation-directory dependent (the same
+#     family id is reused for both the plain and GF-augmented checkpoints),
+#     so it is resolved via the ``geometric_features`` override argument
+#     rather than a distinct family id.
+MODEL_IDENTITIES: Dict[str, PublicationModelIdentity] = {
+    "PointNetMLPJoint": PublicationModelIdentity("GC-PointNet"),
+    "PointNetMLPJoint_headfeat": PublicationModelIdentity("GC-PointNet", has_geometric_features=True),
+    "PointNetMLPJoint_FP": PublicationModelIdentity("LC-PointNet"),
+    "PointNetMLPJoint_FP_headfeat": PublicationModelIdentity("LC-PointNet", has_geometric_features=True),
+    "PointNetMLPJoint_weighted": PublicationModelIdentity("GC-PointNet", training_condition="weighted_loss"),
+    "ArGEnT_self_att_noSDF": PublicationModelIdentity("ArGEnT-A"),
+}
+
+# Derived flat id -> label table, kept for readability at call sites that
+# only need the resolved string (e.g. error messages, ordering).
 DISPLAY_MODEL_NAMES: Dict[str, str] = {
-    "PointNetMLPJoint": "GC-PointNet",
-    "PointNetMLPJoint_headfeat": "GC-PointNet + GF",
-    "PointNetMLPJoint_FP": "LC-PointNet",
-    "PointNetMLPJoint_FP_headfeat": "LC-PointNet + GF",
-    "ArGEnT_self_att_noSDF": "ArGEnT-A",
+    model_id: format_publication_model_label(identity) for model_id, identity in MODEL_IDENTITIES.items()
 }
 DISPLAY_MODEL_ORDER: List[str] = [
     "GC-PointNet",
     "GC-PointNet + GF",
+    "GC-PointNet (weighted loss)",
     "LC-PointNet",
     "LC-PointNet + GF",
+    "LC-PointNet (weighted loss)",
     "ArGEnT-A",
     "ArGEnT-A + GF",
 ]
@@ -103,18 +171,23 @@ def resolve_publication_label(
         Optional checkpoint path/identifier, included only in the error
         message to help diagnose an unresolved mapping.
     """
-    base = DISPLAY_MODEL_NAMES.get(str(model_internal_id))
-    if base is None:
+    identity = MODEL_IDENTITIES.get(str(model_internal_id))
+    if identity is None:
         raise UnresolvedPublicationLabelError(
             "Unresolved publication label for a plotted model. "
             f"model_internal_id={model_internal_id!r}, checkpoint_id={checkpoint_id!r}. "
-            f"Known verified identities: {sorted(DISPLAY_MODEL_NAMES)}. "
-            "Add a verified mapping to DISPLAY_MODEL_NAMES instead of falling back "
-            "to the raw identifier in a paper-facing figure."
+            f"Known verified identities: {sorted(MODEL_IDENTITIES)}. "
+            "Add a verified PublicationModelIdentity to MODEL_IDENTITIES instead of "
+            "falling back to the raw identifier in a paper-facing figure."
         )
     if str(model_internal_id) == "ArGEnT_self_att_noSDF" and geometric_features:
-        return f"{base} + GF"
-    return base
+        identity = PublicationModelIdentity(
+            identity.architecture,
+            has_geometric_features=True,
+            training_condition=identity.training_condition,
+            supervision=identity.supervision,
+        )
+    return format_publication_model_label(identity)
 
 
 def display_model_name(model_family: str) -> str:

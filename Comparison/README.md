@@ -11,7 +11,7 @@ The goal of the paper-results notebooks is not to retrain models; it is to produ
 The suite is organized around four paper analyses:
 
 1. **`01_fp_vs_argent.ipynb`** – compares LC-PointNet, GC-PointNet, and ArGEnT-A on Uniform/Edge and Zonal/Edge.
-2. **`02_engineered_geometric_features.ipynb`** – evaluates the `Edge_arc_feat` ablation for ArGEnT-A, GC-PointNet + GF, and LC-PointNet + GF. ArGEnT-A consumes engineered descriptors through its adapted cross-attention point-token input; unlike PointNet checkpoints, its feature configuration is defined by the training-script `INPUT_COLS`.
+2. **`02_engineered_geometric_features.ipynb`** – evaluates the `Edge_arc_feat` ablation for ArGEnT-A + GF, GC-PointNet + GF, and LC-PointNet + GF. The `Edge_arc_feat` ArGEnT_self_att_noSDF checkpoint consumes the same engineered geometric descriptors through its adapted cross-attention point-token input (`Training_script.py` `INPUT_COLS`), so it is reported as `ArGEnT-A + GF`, not plain `ArGEnT-A`; unlike PointNet checkpoints, its feature configuration is defined by the training-script `INPUT_COLS`.
 3. **`03_data_efficiency.ipynb`** – evaluates the `Edge_10`, `Edge_25`, `Edge_50`, and `Edge_75` subset comparison.
 4. **`04_joint_stress_supervision.ipynb`** – evaluates the `Edge_no_stress` / joint stress-supervision study.
 

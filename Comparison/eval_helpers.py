@@ -55,6 +55,7 @@ DISPLAY_MODEL_ORDER: List[str] = [
     "LC-PointNet",
     "LC-PointNet + GF",
     "ArGEnT-A",
+    "ArGEnT-A + GF",
 ]
 
 
@@ -76,13 +77,21 @@ def ordered_model_families(families: Sequence[str]) -> List[str]:
     )
 
 
-def presentation_table(df: pd.DataFrame) -> pd.DataFrame:
-    """Copy a result table and substitute display names only for notebook output."""
+def presentation_table(df: pd.DataFrame, label_fn: Optional[Any] = None) -> pd.DataFrame:
+    """Copy a result table and substitute display names only for notebook output.
+
+    ``label_fn`` defaults to the module-level :func:`display_model_name`. Pass a
+    notebook-local resolver when a raw ``model_family`` id is genuinely ambiguous
+    across notebooks (for example an ArGEnT checkpoint that is feature-augmented
+    in one ablation directory but not in another) so the correct paper-facing
+    label (e.g. ``ArGEnT-A + GF``) is used for that notebook's rendered tables.
+    """
+    resolver = label_fn if label_fn is not None else display_model_name
     display_df = df.copy()
     for column in ("model_family", "left_family", "right_family",
                    "model_family_baseline", "model_family_ablation"):
         if column in display_df:
-            display_df[column] = display_df[column].map(display_model_name)
+            display_df[column] = display_df[column].map(resolver)
     return display_df
 
 
@@ -490,8 +499,16 @@ def robust_signed_limit(err_arrays: Sequence[np.ndarray], pct: float = 99.0, flo
 
 def plot_field_comparison(geom_nodes_by_model: Dict[str, pd.DataFrame], field_true_col: str, field_pred_col: str,
                            error_unit: str, title_prefix: str, fixed_error_limit: Optional[float] = None,
-                           mark_extrema: str = "min", out_dir: Optional[Path] = None, filename: Optional[str] = None):
-    """Common true/pred colour limits and one common symmetric error limit across models."""
+                           mark_extrema: str = "min", out_dir: Optional[Path] = None, filename: Optional[str] = None,
+                           label_fn: Optional[Any] = None):
+    """Common true/pred colour limits and one common symmetric error limit across models.
+
+    ``label_fn`` defaults to the module-level :func:`display_model_name`. Pass a
+    notebook-local resolver when a raw ``model_family`` id needs a notebook-specific
+    paper-facing label (for example a feature-augmented ArGEnT checkpoint that
+    should render as ``ArGEnT-A + GF``).
+    """
+    resolve_label = label_fn if label_fn is not None else display_model_name
     models = list(geom_nodes_by_model.keys())
     all_true = np.concatenate([geom_nodes_by_model[m][field_true_col].to_numpy() for m in models])
     all_pred = np.concatenate([geom_nodes_by_model[m][field_pred_col].to_numpy() for m in models])
@@ -510,7 +527,7 @@ def plot_field_comparison(geom_nodes_by_model: Dict[str, pd.DataFrame], field_tr
 
         ax = axes[0, j]
         sc = ax.scatter(x, r, c=t, vmin=vmin, vmax=vmax, cmap="viridis", s=10)
-        ax.set_title(f"{display_model_name(m)}\nTrue"); fig.colorbar(sc, ax=ax)
+        ax.set_title(f"{resolve_label(m)}\nTrue"); fig.colorbar(sc, ax=ax)
 
         ax = axes[1, j]
         sc = ax.scatter(x, r, c=p, vmin=vmin, vmax=vmax, cmap="viridis", s=10)

@@ -33,6 +33,7 @@ EXTRA_FEAT_COLS: List[int] = []
 H5_FILENAME: str = "disc_dataset_edge_deriv_zonal.h5"
 EXPECTED_REPR: str = "edge"
 # ==== END PER-ABLATION CONFIG ====
+DRY_RUN_PLACEHOLDER_WIDTH: int = 4
 
 NUM_TARGETS: int = len(TARGET_NAMES)
 QUERY_COLS: List[int] = [0, 1]  # head query always uses (x, r)
@@ -720,8 +721,7 @@ def main(preset_name: str = "M", batch=8, dry_run: bool = False) -> None:
                 f"HDF5 file not found at {h5py_path}. Please ensure the data generation step has been completed and the file is in the expected location."
             )
         print(f"[DRY-RUN] HDF5 not found at {h5py_path}; using synthetic placeholder tensors for static checks.")
-        min_width = 10 if "HEAD_FEAT_COLS" in globals() else 4
-        PS_list_whole = [torch.zeros((32, min_width), dtype=torch.float32) for _ in range(8)]
+        PS_list_whole = [torch.zeros((32, DRY_RUN_PLACEHOLDER_WIDTH), dtype=torch.float32) for _ in range(8)]
     else:
         with h5py.File(h5py_path, "r") as _h5f:
             _repr = _h5f.attrs.get("representation")

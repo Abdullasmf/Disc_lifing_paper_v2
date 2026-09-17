@@ -131,10 +131,11 @@ def masked_farthest_point_sampling(
 
         centroid_xyz = xyz[batch_ids, farthest, :].unsqueeze(1)
         dist2 = torch.sum((xyz - centroid_xyz) ** 2, dim=-1)
-        improved = dist2 < min_dist
+        active = still_valid.unsqueeze(1)
+        improved = (dist2 < min_dist) & active
         min_dist = torch.where(improved, dist2, min_dist)
 
-        masked = torch.where(valid_mask, min_dist, torch.full_like(min_dist, -1.0))
+        masked = torch.where(valid_mask & active, min_dist, torch.full_like(min_dist, -1.0))
         next_far = torch.argmax(masked, dim=1)
 
         # once valid points exhausted, keep repeating first valid centroid
@@ -462,6 +463,45 @@ class GINOTA(nn.Module):
         return out
 
 
+
+
+def _default_ginot_cfg() -> Dict[str, Any]:
+    return {
+        "geom_coord_dim": 2,
+        "query_coord_dim": 2,
+        "geom_posenc_freqs": 8,
+        "query_posenc_freqs": 8,
+        "n_centroids": 128,
+        "n_neighbors": 16,
+        "local_mlp_widths": [128, 128],
+        "token_dim": 128,
+        "encoder_heads": 4,
+        "encoder_cross_attn_layers": 1,
+        "encoder_self_attn_layers": 2,
+        "decoder_cross_attn_layers": 3,
+        "decoder_heads": 4,
+        "decoder_mlp_widths": [256, 128],
+        "head_mlp_widths": [256, 128],
+        "dropout": 0.0,
+    }
+
+
+def _legacy_encoder_cfg_to_ginot_cfg(cfg: Dict[str, Any], arch: Dict[str, Any]) -> Dict[str, Any]:
+    sa_blocks = cfg.get("sa_blocks") or []
+    last_sa = sa_blocks[-1] if sa_blocks else {}
+    token_dim = int(cfg.get("latent_dim", 128))
+    out = _default_ginot_cfg()
+    out["token_dim"] = token_dim
+    out["n_centroids"] = int(last_sa.get("n_samples", last_sa.get("npoint", out["n_centroids"])))
+    out["n_neighbors"] = int(last_sa.get("max_k", last_sa.get("nsample", out["n_neighbors"])))
+    out["geom_posenc_freqs"] = int((cfg.get("posenc") or {}).get("n_freqs", out["geom_posenc_freqs"]))
+    out["query_posenc_freqs"] = int((cfg.get("head_posenc") or {}).get("n_freqs", out["query_posenc_freqs"]))
+    hh = list(arch.get("head_hidden", out["head_mlp_widths"]))
+    out["head_mlp_widths"] = hh if hh else out["head_mlp_widths"]
+    out["decoder_mlp_widths"] = hh if hh else out["decoder_mlp_widths"]
+    out["dropout"] = float(cfg.get("head_dropout", out["dropout"]))
+    return out
+
 class PointNetMLPJoint_FP(GINOTA):
     """Compatibility alias for existing training scripts; implemented as GINOT-A."""
 
@@ -475,7 +515,7 @@ class PointNetMLPJoint(PointNetMLPJoint_FP):
     def __init__(self, latent_dim: int = 0, mlp_hidden: Optional[List[int]] = None, out_dim: int = 2,
                  encoder_cfg: Optional[Dict[str, Any]] = None, in_channels: int = 0):
         if encoder_cfg is None:
-            raise ValueError("encoder_cfg is required")
+            encoder_cfg = _default_ginot_cfg()
         super().__init__(out_dim=out_dim, encoder_cfg=encoder_cfg, in_channels=in_channels, headfeatdim=0)
 
 
@@ -483,13 +523,15 @@ def build_fp_model_from_arch(arch: Dict[str, Any]) -> PointNetMLPJoint_FP:
     if "ginot_cfg" in arch:
         cfg = dict(arch["ginot_cfg"])
     elif "encoder_cfg" in arch:
-        cfg = dict(arch["encoder_cfg"])
-        if "ginot_cfg" in cfg:
-            cfg = dict(cfg["ginot_cfg"])
-        elif isinstance(cfg.get("fp"), dict) and "ginot_cfg" in cfg["fp"]:
-            cfg = dict(cfg["fp"]["ginot_cfg"])
+        enc_cfg = dict(arch["encoder_cfg"])
+        if "ginot_cfg" in enc_cfg:
+            cfg = dict(enc_cfg["ginot_cfg"])
+        elif isinstance(enc_cfg.get("fp"), dict) and "ginot_cfg" in enc_cfg["fp"]:
+            cfg = dict(enc_cfg["fp"]["ginot_cfg"])
+        else:
+            cfg = _legacy_encoder_cfg_to_ginot_cfg(enc_cfg, arch)
     else:
-        raise KeyError("Architecture dict must include 'ginot_cfg' or 'encoder_cfg'")
+        cfg = _default_ginot_cfg()
 
     out_dim = int(arch.get("out_dim", 2))
     in_channels = int(arch.get("in_channels", cfg.get("encoder_gf_dim", 0)))

@@ -1,37 +1,34 @@
 import sys
 import time
-import json
 import argparse
 import torch
 from pathlib import Path
 
-# # Pin this process to GPU 0 BEFORE importing training_script (which selects device at import time)
-# os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-
-# Ensure directory is on path for import resolution
 this_dir = Path(__file__).parent.resolve()
 if str(this_dir) not in sys.path:
     sys.path.insert(0, str(this_dir))
 
 from Training_script import main as train_main  # noqa: E402
+from model_presets import list_presets  # noqa: E402
+
+PRESETS_GPU0 = ["M"]
 
 
-PRESETS_GPU0 = [
-    # "S0_full",
-    "S0_full_ln_pos12",
-]
+def run_with_fallback(preset: str, initial_batch: int, dry_run: bool = False) -> bool:
+    if dry_run:
+        print(f"\n[GPU0] Preset={preset} | dry-run")
+        train_main(preset, initial_batch, dry_run=True)
+        return True
 
-
-def run_with_fallback(preset: str, initial_batch: int) -> bool:
-    """Try training with a sequence of decreasing batch sizes upon OOM."""
     iterative = max(1, int(initial_batch * 0.1))
     batch_plan = list(range(initial_batch, 0, -iterative))
-    batch_plan.append(1)
-    # REMOVED: batch_plan = [1]  (was overriding initial_batch, forcing batch=1 always)
+    if 1 not in batch_plan:
+        batch_plan.append(1)
+
     for b in batch_plan:
         try:
             print(f"\n[GPU0] Preset={preset} | Trying batch={b}")
-            train_main(preset, b)
+            train_main(preset, b, dry_run=False)
             print(f"[GPU0] Preset={preset} | Completed with batch={b}")
             return True
         except RuntimeError as e:
@@ -54,7 +51,7 @@ def run_with_fallback(preset: str, initial_batch: int) -> bool:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Run one or more training presets with automatic batch fallback on OOM."
+        description="Run one or more GINOT-A presets with optional dry-run."
     )
     parser.add_argument(
         "--preset",
@@ -62,7 +59,7 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help=(
             "Preset name(s) to run. Use one or many values, or comma-separated values. "
-            "Use 'all' to run all presets in the JSON file."
+            "Use 'all' to run all presets."
         ),
     )
     parser.add_argument(
@@ -71,26 +68,13 @@ def parse_args() -> argparse.Namespace:
         default=40,
         help="Initial batch size to try before fallback reductions.",
     )
+    parser.add_argument("--dry-run", action="store_true", help="Instantiate model and print config only")
     parser.add_argument(
         "--list-presets",
         action="store_true",
         help="Print available presets and exit.",
     )
     return parser.parse_args()
-
-
-def load_available_presets() -> list[str]:
-    presets_path = this_dir / "model_presets.json"
-    if not presets_path.exists():
-        raise FileNotFoundError(f"Preset file not found: {presets_path}")
-
-    with open(presets_path, "r", encoding="utf-8") as f:
-        all_presets = json.load(f)
-
-    if not isinstance(all_presets, dict):
-        raise RuntimeError("model_presets.json must contain a JSON object at the top level")
-
-    return sorted(all_presets.keys())
 
 
 def resolve_requested_presets(raw_presets, available_presets: list[str]) -> list[str]:
@@ -121,7 +105,7 @@ def resolve_requested_presets(raw_presets, available_presets: list[str]) -> list
 
 def main() -> None:
     args = parse_args()
-    available_presets = load_available_presets()
+    available_presets = list_presets()
 
     if args.list_presets:
         print("Available presets:")
@@ -136,7 +120,7 @@ def main() -> None:
 
     print("Starting GPU0 preset run set...")
     for preset in selected_presets:
-        run_with_fallback(preset, initial_batch=args.initial_batch)
+        run_with_fallback(preset, initial_batch=args.initial_batch, dry_run=args.dry_run)
     print("GPU0 run set finished.")
 
 

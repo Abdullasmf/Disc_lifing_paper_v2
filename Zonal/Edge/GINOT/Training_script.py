@@ -2,6 +2,7 @@
 import random
 import json
 import hashlib
+import argparse
 from typing import List, Tuple, Dict, Optional, Any
 import h5py
 import numpy as np
@@ -15,7 +16,7 @@ import torch.optim as optim
 from sklearn.model_selection import train_test_split
 from torch.utils.data import Dataset, DataLoader
 
-from pn_models import PointNetMLPJoint, PointNetMLPJoint_FP, build_fp_model_from_arch
+from pn_models import PointNetMLPJoint, PointNetMLPJoint_FP, build_fp_model_from_arch, count_trainable_parameters
 
 project_dir = (
     os.path.dirname(os.path.abspath(__file__))
@@ -32,6 +33,7 @@ EXTRA_FEAT_COLS: List[int] = []
 H5_FILENAME: str = "disc_dataset_edge_deriv_zonal.h5"
 EXPECTED_REPR: str = "edge"
 # ==== END PER-ABLATION CONFIG ====
+DRY_RUN_PLACEHOLDER_WIDTH: int = 4
 
 NUM_TARGETS: int = len(TARGET_NAMES)
 QUERY_COLS: List[int] = [0, 1]  # head query always uses (x, r)
@@ -692,12 +694,12 @@ def train(
     print(f"Training finished in {dt/60:.1f} min. Best val MSE: {best_val:.6f}")
 
 
-def main(preset_name: str = "S0", batch=8) -> None:
+def main(preset_name: str = "M", batch=8, dry_run: bool = False) -> None:
     global EXTRA_FEAT_COLS
     # preset_name = "S0"
     # batch = 8
     print(
-        f"Starting training script with preset '{preset_name}' and batch size {batch}"
+        f"Starting training script with preset '{preset_name}' and batch size {batch} | dry_run={dry_run}"
     )
     # Device/backend setup
 
@@ -714,21 +716,25 @@ def main(preset_name: str = "S0", batch=8) -> None:
     h5_dir = Path(repo_dir, "Data_gen", "output")
     h5py_path = Path(h5_dir, H5_FILENAME)
     if not h5py_path.exists():
-        raise FileNotFoundError(
-            f"HDF5 file not found at {h5py_path}. Please ensure the data generation step has been completed and the file is in the expected location."
-        )
-    with h5py.File(h5py_path, "r") as _h5f:
-        _repr = _h5f.attrs.get("representation")
-        if isinstance(_repr, bytes):
-            _repr = _repr.decode("utf-8")
-        if _repr != EXPECTED_REPR:
-            raise RuntimeError(
-                f"H5 representation mismatch at {h5py_path}: expected '{EXPECTED_REPR}', "
-                f"found '{_repr}'. Wrong dataset file for this ablation."
+        if not dry_run:
+            raise FileNotFoundError(
+                f"HDF5 file not found at {h5py_path}. Please ensure the data generation step has been completed and the file is in the expected location."
             )
-    print(f"Loading data from: {h5py_path}")
-    PS_list_whole = load_h5_pointsets(h5py_path)
-    print(f"Loaded {len(PS_list_whole)} datasets from the HDF5 file.")
+        print(f"[DRY-RUN] HDF5 not found at {h5py_path}; using synthetic placeholder tensors for static checks.")
+        PS_list_whole = [torch.zeros((32, DRY_RUN_PLACEHOLDER_WIDTH), dtype=torch.float32) for _ in range(8)]
+    else:
+        with h5py.File(h5py_path, "r") as _h5f:
+            _repr = _h5f.attrs.get("representation")
+            if isinstance(_repr, bytes):
+                _repr = _repr.decode("utf-8")
+            if _repr != EXPECTED_REPR:
+                raise RuntimeError(
+                    f"H5 representation mismatch at {h5py_path}: expected '{EXPECTED_REPR}', "
+                    f"found '{_repr}'. Wrong dataset file for this ablation."
+                )
+        print(f"Loading data from: {h5py_path}")
+        PS_list_whole = load_h5_pointsets(h5py_path)
+        print(f"Loaded {len(PS_list_whole)} datasets from the HDF5 file.")
     width0 = int(PS_list_whole[0].shape[1])
     # # [fix_ablation_extra_feat_cols] patched: hardcoded for Edge ablation
     EXTRA_FEAT_COLS = []
@@ -739,25 +745,15 @@ def main(preset_name: str = "S0", batch=8) -> None:
         )
     print(f"EXTRA_FEAT_COLS=[] (0 extra feature(s)) for Edge ablation")
 
-    # Load external presets JSON to allow expanding model zoo without editing this script
-    presets_path = Path(project_dir, "model_presets.json")
-    if not presets_path.exists():
-        raise FileNotFoundError(
-            f"Preset file 'model_presets.json' not found at {presets_path}. Please create it or copy the provided template."
-        )
-    with open(presets_path, "r", encoding="utf-8") as f:
-        try:
-            PRESETS = json.load(f)
-        except Exception as exc:
-            raise RuntimeError(
-                "Failed to parse model_presets.json (invalid JSON)"
-            ) from exc
-    if preset_name not in PRESETS:
-        raise KeyError(
-            f"Preset '{preset_name}' not found. Available presets: {', '.join(sorted(PRESETS.keys()))}"
-        )
+    # Load Python presets
+    from model_presets import get_preset, list_presets
 
-    _cfg = PRESETS[preset_name]
+    try:
+        _cfg = get_preset(preset_name)
+    except KeyError as exc:
+        raise KeyError(
+            f"Preset '{preset_name}' not found. Available presets: {', '.join(list_presets())}"
+        ) from exc
     # In-file configuration (no CLI needed)
     epochs: int = int(_cfg.get("epochs", 10000))
     lr: float = float(_cfg.get("lr", 3e-4))
@@ -975,7 +971,7 @@ def main(preset_name: str = "S0", batch=8) -> None:
             encoder_cfg=encoder_cfg,
             in_channels=len(EXTRA_FEAT_COLS),
         )
-    param_count = sum(p.numel() for p in model.parameters())
+    param_count = count_trainable_parameters(model)
     print(f"Model initialized with {param_count:,} parameters.")
     if resume_checkpoint is not None:
         try:
@@ -986,6 +982,31 @@ def main(preset_name: str = "S0", batch=8) -> None:
                 f"Checkpoint model state is incompatible ({exc}). Initializing new model."
             )
             resume_checkpoint = None
+
+    ginot_cfg_for_report = _cfg.get("ginot_cfg", _cfg.get("fp", {}).get("ginot_cfg", {}))
+    head_gf_dim_report = len(HEAD_FEAT_COLS) if "HEAD_FEAT_COLS" in globals() else 0
+    if dry_run:
+        print("[DRY-RUN] model_family=GINOT-A")
+        print(f"[DRY-RUN] preset={preset_name}")
+        print(f"[DRY-RUN] trainable_params={param_count}")
+        print(f"[DRY-RUN] input_coord_dim=2")
+        print(f"[DRY-RUN] encoder_gf_dim={len(EXTRA_FEAT_COLS)}")
+        print(f"[DRY-RUN] head_query_gf_dim={head_gf_dim_report}")
+        print(f"[DRY-RUN] output_dim={NUM_TARGETS}")
+        print(f"[DRY-RUN] target_names={TARGET_NAMES}")
+        print(f"[DRY-RUN] sampled_token_count={ginot_cfg_for_report.get('n_centroids')}")
+        print(f"[DRY-RUN] grouping=knn k={ginot_cfg_for_report.get('n_neighbors')}")
+        print(
+            f"[DRY-RUN] encoder_depths(cross/self)={ginot_cfg_for_report.get('encoder_cross_attn_layers')}/{ginot_cfg_for_report.get('encoder_self_attn_layers')}"
+        )
+        print(
+            f"[DRY-RUN] encoder_heads={ginot_cfg_for_report.get('encoder_heads')} decoder_depth={ginot_cfg_for_report.get('decoder_cross_attn_layers')} decoder_heads={ginot_cfg_for_report.get('decoder_heads')}"
+        )
+        print(f"[DRY-RUN] hdf5={h5py_path.name}")
+        print(f"[DRY-RUN] split_seed=42")
+        print(f"[DRY-RUN] test_fraction=0.2")
+        print(f"[DRY-RUN] training_fraction=0.8")
+        return
 
     # Ensure save directory exists
     save_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1014,8 +1035,13 @@ def main(preset_name: str = "S0", batch=8) -> None:
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="GINOT-A training entrypoint")
+    parser.add_argument("--preset", type=str, default="M", help="Preset name (XS/S/M/L/XL)")
+    parser.add_argument("--batch", type=int, default=8, help="Training batch size for batched_all mode")
+    parser.add_argument("--dry-run", action="store_true", help="Instantiate model and print config without training")
+    args = parser.parse_args()
     try:
-        main("S_full_ln_pos12_fp", 1)
+        main(args.preset, args.batch, dry_run=args.dry_run)
     except Exception as e:
         print(f"Error during training: {e}")
         raise

@@ -5014,6 +5014,6 @@
   "split_fraction": 0.2,
   "evaluation_label": "validation-split evaluation",
   "independence_basis": "A deterministic geometry holdout is used, but checkpoint-selection independence is not proved.",
-  "timestamp_utc": "2026-09-01T12:39:36Z",
-  "notebook_commit_sha": "7c844bffb553985f439f49c8d69e0b46bdc6a61d"
+  "timestamp_utc": "2026-09-03T16:58:35Z",
+  "notebook_commit_sha": "80b67fdabeca50d66591b3feb1455bc3e1fb729b"
 }

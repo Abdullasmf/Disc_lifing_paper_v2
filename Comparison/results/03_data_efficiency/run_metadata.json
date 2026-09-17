@@ -1,10 +1,10 @@
 {
-  "commit_sha": "7c844bffb553985f439f49c8d69e0b46bdc6a61d",
+  "commit_sha": "80b67fdabeca50d66591b3feb1455bc3e1fb729b",
   "evaluation_label": "validation-split evaluation",
   "results_dir": "c:\\Users\\abfat\\Desktop\\Disc_lifing_paper_v2\\Comparison\\results\\03_data_efficiency",
   "families": [
-    "ArGEnT_self_att_noSDF",
-    "PointNetMLPJoint_FP"
+    "PointNetMLPJoint_FP",
+    "ArGEnT_self_att_noSDF"
   ],
   "ablations": [
     "Edge_10",

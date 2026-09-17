@@ -5011,6 +5011,6 @@
   "split_seed": 42,
   "split_fraction": 0.2,
   "evaluation_label": "validation-split evaluation",
-  "timestamp_utc": "2026-09-01T12:41:27Z",
-  "notebook_commit_sha": "7c844bffb553985f439f49c8d69e0b46bdc6a61d"
+  "timestamp_utc": "2026-09-03T17:02:58Z",
+  "notebook_commit_sha": "80b67fdabeca50d66591b3feb1455bc3e1fb729b"
 }

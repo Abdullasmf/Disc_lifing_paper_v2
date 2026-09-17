@@ -1,6 +1,6 @@
 # Engineered geometric features notebook summary
 
-Repository commit: `7c844bffb553985f439f49c8d69e0b46bdc6a61d`
+Repository commit: `80b67fdabeca50d66591b3feb1455bc3e1fb729b`
 
 Evaluation label: **validation-split evaluation**.
 
@@ -12,4 +12,3 @@ Dataset available: quantitative feature-aware inference executed on the validati
 
 Static audit finding: no evidence was found that ArGEnT itself was dropping engineered inputs; its checkpoint/training metadata requires the engineered columns to enter through the encoder token tensor.
 A separate notebook-side fragility was fixed for PointNet headfeat inference so engineered features are now addressed by their true training column IDs and not by positional prefix slicing.
-Reader-facing outputs use ArGEnT-A, GC-PointNet + GF, and LC-PointNet + GF; raw model-family identifiers remain only in audit CSVs and metadata for traceability.

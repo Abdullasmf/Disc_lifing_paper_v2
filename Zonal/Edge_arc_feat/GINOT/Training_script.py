@@ -16,7 +16,7 @@ import torch.optim as optim
 from sklearn.model_selection import train_test_split
 from torch.utils.data import Dataset, DataLoader
 
-from pn_models import PointNetMLPJoint, PointNetMLPJoint_FP, build_fp_model_from_arch, count_trainable_parameters
+from pn_models import GINOT_A, count_trainable_parameters
 
 project_dir = (
     os.path.dirname(os.path.abspath(__file__))
@@ -713,6 +713,8 @@ def train(
                 "headfeatcols": HEAD_FEAT_COLS,
                 "headfeatdim": len(HEAD_FEAT_COLS),
                 "model_family": "GINOT-A",
+                "model_class": "GINOT_A",
+                "model_config_identity": "GINOT_A",
                 "model_name": model_name,
                 "history": history,
                 "config": {
@@ -731,6 +733,33 @@ def train(
 
 def main(preset_name: str = "M", batch=8, dry_run: bool = False) -> None:
     global EXTRA_FEAT_COLS, HEAD_FEAT_COLS
+    from model_presets import get_preset, list_presets
+
+    try:
+        _cfg = get_preset(preset_name)
+    except KeyError as exc:
+        raise KeyError(
+            f"Preset '{preset_name}' not found. Available presets: {', '.join(list_presets())}"
+        ) from exc
+
+    ginot_cfg: Dict[str, Any] = dict(_cfg.get("ginot_cfg", {}))
+    if not ginot_cfg:
+        raise RuntimeError(f"Preset '{preset_name}' does not define a GINOT_A configuration.")
+
+    if dry_run:
+        EXTRA_FEAT_COLS = [3, 4, 5, 6, 7]
+        HEAD_FEAT_COLS = [3, 4, 5, 6, 7]
+        GINOT_A(
+            cfg=ginot_cfg,
+            out_dim=NUM_TARGETS,
+            in_channels=len(EXTRA_FEAT_COLS),
+            headfeatdim=len(HEAD_FEAT_COLS),
+        )
+        print("Model family: GINOT-A")
+        print("Model class: GINOT_A")
+        print(f"Selected preset: {preset_name}")
+        return
+
     # preset_name = "S0"
     # batch = 8
     print(
@@ -780,15 +809,6 @@ def main(preset_name: str = "M", batch=8, dry_run: bool = False) -> None:
         )
     print(f"EXTRA_FEAT_COLS=HEAD_FEAT_COLS={EXTRA_FEAT_COLS} for Edge_arc_feat")
 
-    # Load Python presets
-    from model_presets import get_preset, list_presets
-
-    try:
-        _cfg = get_preset(preset_name)
-    except KeyError as exc:
-        raise KeyError(
-            f"Preset '{preset_name}' not found. Available presets: {', '.join(list_presets())}"
-        ) from exc
     # In-file configuration (no CLI needed)
     epochs: int = int(_cfg.get("epochs", 10000))
     lr: float = float(_cfg.get("lr", 3e-4))
@@ -807,7 +827,7 @@ def main(preset_name: str = "M", batch=8, dry_run: bool = False) -> None:
     gf_hidden: List[int] = list(_cfg["gf_hidden"])  # global feature head
     head_hidden: List[int] = list(_cfg["head_hidden"])  # MLP head sizes
     # Optional human-readable model name (prefix for the file); set to None to use default
-    model_name: Optional[str] = _cfg.get("model_name", None)  # e.g., "pn_small_r0p08"
+    model_name: Optional[str] = _cfg.get("model_name", None)  # e.g., "ginot_a_m"
 
     # Fourier positional encodings to enhance spatial/detail sensitivity
     # Allow overriding positional encodings per preset; default to 4 freqs if unspecified
@@ -847,12 +867,16 @@ def main(preset_name: str = "M", batch=8, dry_run: bool = False) -> None:
         "normalization_fix": "v2",
         "fp": fp_cfg,
         "loss_label": "equal_loss_stress_loglife",
+        "model_family": "GINOT-A",
+        "model_class": "GINOT_A",
+        "model_config_identity": "GINOT_A",
+        "ginot_cfg": ginot_cfg,
     }
     arch_hash = hashlib.md5(
         json.dumps(arch_for_hash, sort_keys=True).encode("utf-8")
     ).hexdigest()[:8]
     save_dir = Path(project_dir, "Trained_models")
-    base_name = model_name if model_name else "pnmlp_fp_headfeat"
+    base_name = model_name if model_name else "ginot_a_headfeat"
     save_path = save_dir / f"{base_name}_{arch_hash}.pt"
 
     resume_checkpoint = None
@@ -882,6 +906,12 @@ def main(preset_name: str = "M", batch=8, dry_run: bool = False) -> None:
     )
 
     if resume_checkpoint is not None:
+        ckpt_model_family = resume_checkpoint.get("model_family")
+        if ckpt_model_family not in {None, "GINOT-A"}:
+            raise RuntimeError("Refusing to resume a checkpoint from another model family or ablation.")
+        ckpt_model_class = resume_checkpoint.get("model_class")
+        if ckpt_model_class not in {None, "GINOT_A"}:
+            raise RuntimeError("Refusing to resume a checkpoint from another model class.")
         print(
             "Overwriting normalization stats with values from checkpoint to ensure consistency."
         )
@@ -889,8 +919,6 @@ def main(preset_name: str = "M", batch=8, dry_run: bool = False) -> None:
         coord_half_range = resume_checkpoint["coord_half_range"]
         target_mean = resume_checkpoint["target_mean"]
         target_std = resume_checkpoint["target_std"]
-        if resume_checkpoint.get("model_family") not in {"GINOT-A", "PointNetMLPJoint_FP_headfeat"}:
-            raise RuntimeError("Refusing to resume a checkpoint from another model family or ablation.")
         if resume_checkpoint.get("headfeatdim") != len(HEAD_FEAT_COLS):
             raise RuntimeError("Checkpoint headfeatdim does not match this FP head-feature ablation.")
         if resume_checkpoint.get("headfeatcols", resume_checkpoint.get("head_feat_cols")) != HEAD_FEAT_COLS:
@@ -1004,12 +1032,12 @@ def main(preset_name: str = "M", batch=8, dry_run: bool = False) -> None:
         "head_norm": head_norm,
         "head_dropout": head_dropout,
     }
-    model = build_fp_model_from_arch({
-        "encoder_cfg": {**encoder_cfg, "fp": fp_cfg, "in_channels": len(EXTRA_FEAT_COLS)},
-        "head_hidden": head_hidden,
-        "out_dim": NUM_TARGETS,
-        "headfeatdim": len(HEAD_FEAT_COLS),
-    })
+    model = GINOT_A(
+        cfg=ginot_cfg,
+        out_dim=NUM_TARGETS,
+        in_channels=len(EXTRA_FEAT_COLS),
+        headfeatdim=len(HEAD_FEAT_COLS),
+    )
     param_count = count_trainable_parameters(model)
     print(f"Model initialized with {param_count:,} parameters.")
     if resume_checkpoint is not None:
@@ -1022,30 +1050,6 @@ def main(preset_name: str = "M", batch=8, dry_run: bool = False) -> None:
             )
             resume_checkpoint = None
 
-    ginot_cfg_for_report = _cfg.get("ginot_cfg", _cfg.get("fp", {}).get("ginot_cfg", {}))
-    head_gf_dim_report = len(HEAD_FEAT_COLS) if "HEAD_FEAT_COLS" in globals() else 0
-    if dry_run:
-        print("[DRY-RUN] model_family=GINOT-A")
-        print(f"[DRY-RUN] preset={preset_name}")
-        print(f"[DRY-RUN] trainable_params={param_count}")
-        print(f"[DRY-RUN] input_coord_dim=2")
-        print(f"[DRY-RUN] encoder_gf_dim={len(EXTRA_FEAT_COLS)}")
-        print(f"[DRY-RUN] head_query_gf_dim={head_gf_dim_report}")
-        print(f"[DRY-RUN] output_dim={NUM_TARGETS}")
-        print(f"[DRY-RUN] target_names={TARGET_NAMES}")
-        print(f"[DRY-RUN] sampled_token_count={ginot_cfg_for_report.get('n_centroids')}")
-        print(f"[DRY-RUN] grouping=knn k={ginot_cfg_for_report.get('n_neighbors')}")
-        print(
-            f"[DRY-RUN] encoder_depths(cross/self)={ginot_cfg_for_report.get('encoder_cross_attn_layers')}/{ginot_cfg_for_report.get('encoder_self_attn_layers')}"
-        )
-        print(
-            f"[DRY-RUN] encoder_heads={ginot_cfg_for_report.get('encoder_heads')} decoder_depth={ginot_cfg_for_report.get('decoder_cross_attn_layers')} decoder_heads={ginot_cfg_for_report.get('decoder_heads')}"
-        )
-        print(f"[DRY-RUN] hdf5={h5py_path.name}")
-        print(f"[DRY-RUN] split_seed=42")
-        print(f"[DRY-RUN] test_fraction=0.2")
-        print(f"[DRY-RUN] training_fraction=0.8")
-        return
 
     # Ensure save directory exists
     save_path.parent.mkdir(parents=True, exist_ok=True)

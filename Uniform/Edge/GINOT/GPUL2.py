@@ -16,7 +16,6 @@ PRESETS_GPU0 = ["M"]
 
 def run_with_fallback(preset: str, initial_batch: int, dry_run: bool = False) -> bool:
     if dry_run:
-        print(f"\n[GPU0] Preset={preset} | dry-run")
         train_main(preset, initial_batch, dry_run=True)
         return True
 
@@ -118,10 +117,12 @@ def main() -> None:
 
     selected_presets = resolve_requested_presets(args.preset, available_presets)
 
-    print("Starting GPU0 preset run set...")
+    if not args.dry_run:
+        print("Starting GPU0 preset run set...")
     for preset in selected_presets:
         run_with_fallback(preset, initial_batch=args.initial_batch, dry_run=args.dry_run)
-    print("GPU0 run set finished.")
+    if not args.dry_run:
+        print("GPU0 run set finished.")
 
 
 if __name__ == "__main__":

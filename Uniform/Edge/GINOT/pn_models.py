@@ -7,10 +7,7 @@ import torch
 import torch.nn as nn
 
 __all__ = [
-    "GINOTA",
-    "PointNetMLPJoint",
-    "PointNetMLPJoint_FP",
-    "build_fp_model_from_arch",
+    "GINOT_A",
     "count_trainable_parameters",
 ]
 
@@ -231,7 +228,7 @@ class GINOTConfig:
     head_gf_dim: int = 0
 
 
-class GINOTA(nn.Module):
+class GINOT_A(nn.Module):
     """GINOT-A: boundary-node geometry encoder + query-conditioned decoder."""
 
     def __init__(self, cfg: Dict[str, Any], out_dim: int, in_channels: int = 0, headfeatdim: int = 0):
@@ -305,6 +302,8 @@ class GINOTA(nn.Module):
     def get_arch(self) -> Dict[str, Any]:
         return {
             "model_family": "GINOT-A",
+            "model_class": "GINOT_A",
+            "model_config_identity": "GINOT_A",
             "ginot_cfg": {
                 "geom_coord_dim": self.cfg.geom_coord_dim,
                 "query_coord_dim": self.cfg.query_coord_dim,
@@ -485,61 +484,3 @@ def _default_ginot_cfg() -> Dict[str, Any]:
         "dropout": 0.0,
     }
 
-
-def _legacy_encoder_cfg_to_ginot_cfg(cfg: Dict[str, Any], arch: Dict[str, Any]) -> Dict[str, Any]:
-    sa_blocks = cfg.get("sa_blocks") or []
-    last_sa = sa_blocks[-1] if sa_blocks else {}
-    token_dim = int(cfg.get("latent_dim", 128))
-    out = _default_ginot_cfg()
-    out["token_dim"] = token_dim
-    out["n_centroids"] = int(last_sa.get("n_samples", last_sa.get("npoint", out["n_centroids"])))
-    out["n_neighbors"] = int(last_sa.get("max_k", last_sa.get("nsample", out["n_neighbors"])))
-    out["geom_posenc_freqs"] = int((cfg.get("posenc") or {}).get("n_freqs", out["geom_posenc_freqs"]))
-    out["query_posenc_freqs"] = int((cfg.get("head_posenc") or {}).get("n_freqs", out["query_posenc_freqs"]))
-    hh = list(arch.get("head_hidden", out["head_mlp_widths"]))
-    out["head_mlp_widths"] = hh if hh else out["head_mlp_widths"]
-    out["decoder_mlp_widths"] = hh if hh else out["decoder_mlp_widths"]
-    out["dropout"] = float(cfg.get("head_dropout", out["dropout"]))
-    return out
-
-class PointNetMLPJoint_FP(GINOTA):
-    """Compatibility alias for existing training scripts; implemented as GINOT-A."""
-
-    def __init__(self, out_dim: int, encoder_cfg: Dict[str, Any], in_channels: int = 0, headfeatdim: int = 0):
-        super().__init__(cfg=encoder_cfg, out_dim=out_dim, in_channels=in_channels, headfeatdim=headfeatdim)
-
-
-class PointNetMLPJoint(PointNetMLPJoint_FP):
-    """Compatibility alias for existing training scripts; implemented as GINOT-A."""
-
-    def __init__(self, latent_dim: int = 0, mlp_hidden: Optional[List[int]] = None, out_dim: int = 2,
-                 encoder_cfg: Optional[Dict[str, Any]] = None, in_channels: int = 0):
-        if encoder_cfg is None:
-            encoder_cfg = _default_ginot_cfg()
-        super().__init__(out_dim=out_dim, encoder_cfg=encoder_cfg, in_channels=in_channels, headfeatdim=0)
-
-
-def build_fp_model_from_arch(arch: Dict[str, Any]) -> PointNetMLPJoint_FP:
-    if "ginot_cfg" in arch:
-        cfg = dict(arch["ginot_cfg"])
-    elif "encoder_cfg" in arch:
-        enc_cfg = dict(arch["encoder_cfg"])
-        if "ginot_cfg" in enc_cfg:
-            cfg = dict(enc_cfg["ginot_cfg"])
-        elif isinstance(enc_cfg.get("fp"), dict) and "ginot_cfg" in enc_cfg["fp"]:
-            cfg = dict(enc_cfg["fp"]["ginot_cfg"])
-        else:
-            cfg = _legacy_encoder_cfg_to_ginot_cfg(enc_cfg, arch)
-    else:
-        cfg = _default_ginot_cfg()
-
-    out_dim = int(arch.get("out_dim", 2))
-    in_channels = int(arch.get("in_channels", cfg.get("encoder_gf_dim", 0)))
-    headfeatdim = int(arch.get("headfeatdim", cfg.get("head_gf_dim", 0)))
-
-    return PointNetMLPJoint_FP(
-        out_dim=out_dim,
-        encoder_cfg=cfg,
-        in_channels=in_channels,
-        headfeatdim=headfeatdim,
-    )

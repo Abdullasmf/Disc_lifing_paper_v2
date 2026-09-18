@@ -390,6 +390,21 @@ def set_seed(seed: int = 42) -> None:
         torch.cuda.manual_seed_all(seed)
 
 
+def _prohibit_resume_or_overwrite(
+    preset_name: str,
+    save_path: Path,
+    resume_request: Optional[str] = None,
+) -> None:
+    msg = (
+        f"GINOT-A preset '{preset_name}' checkpoint '{save_path}': "
+        "overwrite and resume are prohibited"
+    )
+    if resume_request:
+        raise RuntimeError(f"{msg}. Resume request: {resume_request}")
+    if save_path.exists():
+        raise RuntimeError(msg)
+
+
 def train(
     model: nn.Module,
     train_loader: DataLoader,
@@ -408,7 +423,6 @@ def train(
     early_stopping_patience: Optional[int] = 20,
     early_stopping_min_delta: float = 0.0,
     use_amp: bool = False,
-    resume_checkpoint: Optional[Dict] = None,
     model_name: Optional[str] = None,
 ) -> None:
     model = model.to(device)
@@ -417,23 +431,6 @@ def train(
     best_val = float("inf")
     start_epoch = 1
     history: List[Dict[str, Any]] = []
-
-    if resume_checkpoint is not None:
-        print("Resuming training from checkpoint...")
-        model.load_state_dict(resume_checkpoint["model_state"])
-        if "config" in resume_checkpoint:
-            start_epoch = resume_checkpoint["config"].get("epochs_trained", 0) + 1
-            best_val = resume_checkpoint["config"].get("best_val", float("inf"))
-        # Fallback for legacy keys
-        if best_val == float("inf") and "best_val_loss" in resume_checkpoint:
-            best_val = resume_checkpoint["best_val_loss"]
-        if "optimizer_state" in resume_checkpoint:
-            optimizer.load_state_dict(resume_checkpoint["optimizer_state"])
-        if "scaler_state" in resume_checkpoint:
-            scaler.load_state_dict(resume_checkpoint["scaler_state"])
-        if isinstance(resume_checkpoint.get("history"), list):
-            history = list(resume_checkpoint["history"])
-        print(f"Resumed state: start_epoch={start_epoch}, best_val={best_val:.6f}")
 
     # For raw-space validation logging
     target_mean_d = target_mean.to(device)  # [2]
@@ -447,12 +444,6 @@ def train(
         patience=20,
         min_lr=1e-6,
     )
-
-    if resume_checkpoint is not None and "scheduler_state" in resume_checkpoint:
-        try:
-            scheduler.load_state_dict(resume_checkpoint["scheduler_state"])
-        except (KeyError, ValueError, RuntimeError) as exc:
-            print(f"Warning: failed to restore scheduler state: {exc}")
 
     t0 = time.time()
     epochs_since_improve = 0
@@ -697,7 +688,13 @@ def train(
     print(f"Training finished in {dt/60:.1f} min. Best val MSE: {best_val:.6f}")
 
 
-def main(preset_name: str = "M", batch=8, dry_run: bool = False) -> None:
+def main(
+    preset_name: str = "M",
+    batch: int = 8,
+    dry_run: bool = False,
+    resume_request: Optional[str] = None,
+    save_path_override: Optional[Path] = None,
+) -> None:
     global EXTRA_FEAT_COLS
     from model_presets import get_preset, list_presets
 
@@ -831,19 +828,8 @@ def main(preset_name: str = "M", batch=8, dry_run: bool = False) -> None:
     ).hexdigest()[:8]
     save_dir = Path(project_dir, "Trained_models")
     base_name = model_name if model_name else "ginot_a"
-    save_path = save_dir / f"{base_name}_{arch_hash}.pt"
-
-    resume_checkpoint = None
-    if save_path.exists():
-        print(f"Found existing checkpoint at {save_path}. Loading...")
-        try:
-            resume_checkpoint = torch.load(save_path, map_location="cpu")
-            print("Checkpoint loaded successfully.")
-        except Exception as e:
-            print(f"Failed to load checkpoint: {e}. Starting fresh.")
-            resume_checkpoint = None
-    else:
-        print(f"No existing checkpoint at {save_path}. Initializing new model.")
+    save_path = save_path_override if save_path_override is not None else (save_dir / f"{base_name}_{arch_hash}.pt")
+    _prohibit_resume_or_overwrite(preset_name, save_path, resume_request=resume_request)
 
     set_seed(42)
 
@@ -859,40 +845,6 @@ def main(preset_name: str = "M", batch=8, dry_run: bool = False) -> None:
         compute_global_normalization(train_tensors)
     )
 
-    if resume_checkpoint is not None:
-        arch_identity = resume_checkpoint.get("arch") or {}
-        ckpt_model_family = resume_checkpoint.get("model_family", arch_identity.get("model_family"))
-        ckpt_model_class = resume_checkpoint.get("model_class", arch_identity.get("model_class"))
-        ckpt_model_config_identity = resume_checkpoint.get(
-            "model_config_identity",
-            arch_identity.get("model_config_identity"),
-        )
-        if ckpt_model_family != "GINOT-A":
-            raise RuntimeError("Refusing to resume a checkpoint from another model family or ablation.")
-        if ckpt_model_class is None:
-            ckpt_model_class = "GINOT_A"
-        if ckpt_model_config_identity is None:
-            ckpt_model_config_identity = "GINOT_A"
-        if ckpt_model_class != "GINOT_A" or ckpt_model_config_identity != "GINOT_A":
-            raise RuntimeError("Refusing to resume a checkpoint from another model class/config identity.")
-        print(
-            "Overwriting normalization stats with values from checkpoint to ensure consistency."
-        )
-        coord_center = resume_checkpoint["coord_center"]
-        coord_half_range = resume_checkpoint["coord_half_range"]
-        target_mean = resume_checkpoint["target_mean"]
-        target_std = resume_checkpoint["target_std"]
-        # Backward compatibility: recompute extra_feat_stats if absent in old checkpoints
-        if resume_checkpoint.get("extra_feat_stats") is not None:
-            extra_feat_stats = resume_checkpoint["extra_feat_stats"]
-            if resume_checkpoint.get("extra_feat_cols") is not None:
-                _ckpt_efc = resume_checkpoint["extra_feat_cols"]
-                if _ckpt_efc != []:
-                    raise RuntimeError(
-                        f"Checkpoint extra_feat_cols {_ckpt_efc} != ablation EXTRA_FEAT_COLS []. "
-                        "The checkpoint was trained with wrong feature columns. "
-                        "Delete the stale checkpoint and retrain."
-                    )
 
     print(
         "Using per-target z-score normalization so Stress (~200-1200) and LogLife (~3-7) are balanced during training."
@@ -998,16 +950,6 @@ def main(preset_name: str = "M", batch=8, dry_run: bool = False) -> None:
     )
     param_count = count_trainable_parameters(model)
     print(f"Model initialized with {param_count:,} parameters.")
-    if resume_checkpoint is not None:
-        try:
-            model.load_state_dict(resume_checkpoint["model_state"], strict=True)
-            print("Checkpoint model state is compatible and will be resumed.")
-        except (KeyError, RuntimeError, ValueError) as exc:
-            print(
-                f"Checkpoint model state is incompatible ({exc}). Initializing new model."
-            )
-            resume_checkpoint = None
-
 
     # Ensure save directory exists
     save_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1030,19 +972,43 @@ def main(preset_name: str = "M", batch=8, dry_run: bool = False) -> None:
         early_stopping_patience=early_stopping_patience,
         early_stopping_min_delta=early_stopping_min_delta,
         use_amp=(device.type == "cuda"),
-        resume_checkpoint=resume_checkpoint,
         model_name=model_name,
     )
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="GINOT-A training entrypoint")
-    parser.add_argument("--preset", type=str, default="M", help="Preset name (XS/S/M/L/XL)")
+    parser.add_argument("--preset", type=str, default="M", help="Preset name (XS/S/M/L/XL/MATCH_250K/MATCH_250K_HIRES)")
     parser.add_argument("--batch", type=int, default=8, help="Training batch size for batched_all mode")
     parser.add_argument("--dry-run", action="store_true", help="Instantiate model and print config without training")
+    parser.add_argument("--resume", action="store_true", help="Prohibited resume flag for fail-fast guard")
+    parser.add_argument(
+        "--resume-checkpoint",
+        "--checkpoint-to-resume",
+        "--checkpoint",
+        "--resume-from",
+        dest="resume_checkpoint",
+        type=str,
+        default=None,
+        help="Prohibited resume/checkpoint path argument",
+    )
     args = parser.parse_args()
+
+    resume_request: Optional[str] = None
+    if args.resume:
+        resume_request = "--resume"
+    elif args.resume_checkpoint:
+        resume_request = f"--resume-checkpoint={args.resume_checkpoint}"
+
+    if resume_request:
+        raise RuntimeError(
+            f"GINOT-A preset '{args.preset}' checkpoint '<not-started>': "
+            "overwrite and resume are prohibited. "
+            f"Resume request: {resume_request}"
+        )
+
     try:
-        main(args.preset, args.batch, dry_run=args.dry_run)
+        main(args.preset, args.batch, dry_run=args.dry_run, resume_request=resume_request)
     except Exception as e:
         print(f"Error during training: {e}")
         raise

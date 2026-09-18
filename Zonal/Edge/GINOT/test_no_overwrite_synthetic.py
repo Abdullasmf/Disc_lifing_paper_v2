@@ -1,16 +1,22 @@
 from __future__ import annotations
 
-import importlib.util
+import ast
 import tempfile
 from pathlib import Path
+from typing import Optional
 
 
-def _load_module(module_path: Path):
-    spec = importlib.util.spec_from_file_location(module_path.stem, module_path)
-    module = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
-    spec.loader.exec_module(module)
-    return module
+def _load_guard(script_path: Path):
+    source = script_path.read_text(encoding="utf-8")
+    module_ast = ast.parse(source, filename=str(script_path))
+    for node in module_ast.body:
+        if isinstance(node, ast.FunctionDef) and node.name == "_prohibit_resume_or_overwrite":
+            isolated = ast.Module(body=[node], type_ignores=[])
+            code = compile(isolated, filename=str(script_path), mode="exec")
+            ns = {"Path": Path, "Optional": Optional}
+            exec(code, ns)
+            return ns["_prohibit_resume_or_overwrite"]
+    raise RuntimeError(f"No _prohibit_resume_or_overwrite guard found in {script_path}")
 
 
 def run_no_overwrite_smoke_test() -> None:
@@ -23,8 +29,7 @@ def run_no_overwrite_smoke_test() -> None:
     ]
 
     for script_path in training_scripts:
-        module = _load_module(script_path)
-        guard = getattr(module, "_prohibit_resume_or_overwrite")
+        guard = _load_guard(script_path)
 
         with tempfile.TemporaryDirectory() as td:
             ckpt_path = Path(td) / "dummy.pt"

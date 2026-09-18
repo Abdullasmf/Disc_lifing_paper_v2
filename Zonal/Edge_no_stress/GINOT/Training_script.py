@@ -1000,6 +1000,13 @@ if __name__ == "__main__":
     elif unknown_resume_flags:
         resume_request = ", ".join(unknown_resume_flags)
 
+    if resume_request:
+        raise RuntimeError(
+            f"GINOT-A preset '{args.preset}' checkpoint '<not-started>': "
+            "overwrite and resume are prohibited. "
+            f"Resume request: {resume_request}"
+        )
+
     try:
         main(args.preset, args.batch, dry_run=args.dry_run, resume_request=resume_request)
     except Exception as e:

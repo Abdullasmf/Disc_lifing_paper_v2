@@ -869,6 +869,10 @@ def main(preset_name: str = "M", batch=8, dry_run: bool = False) -> None:
         )
         if ckpt_model_family != "GINOT-A":
             raise RuntimeError("Refusing to resume a checkpoint from another model family or ablation.")
+        if ckpt_model_class is None:
+            ckpt_model_class = "GINOT_A"
+        if ckpt_model_config_identity is None:
+            ckpt_model_config_identity = "GINOT_A"
         if ckpt_model_class != "GINOT_A" or ckpt_model_config_identity != "GINOT_A":
             raise RuntimeError("Refusing to resume a checkpoint from another model class/config identity.")
         print(

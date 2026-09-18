@@ -21,15 +21,12 @@ def _load_guard(script_path: Path):
 
 def run_no_overwrite_smoke_test() -> None:
     repo_root = Path(__file__).resolve().parents[3]
-    script_patterns = [
-        "Zonal/Edge*/GINOT/Training_script.py",
-        "Uniform/Edge/GINOT/Training_script.py",
+    training_scripts = [
+        repo_root / "Zonal/Edge/GINOT/Training_script.py",
+        repo_root / "Uniform/Edge/GINOT/Training_script.py",
+        repo_root / "Zonal/Edge_no_stress/GINOT/Training_script.py",
+        repo_root / "Zonal/Edge_arc_feat/GINOT/Training_script.py",
     ]
-    training_scripts = sorted({
-        path
-        for pattern in script_patterns
-        for path in repo_root.glob(pattern)
-    })
     if not training_scripts:
         raise RuntimeError("No GINOT training scripts found for synthetic guard test.")
 

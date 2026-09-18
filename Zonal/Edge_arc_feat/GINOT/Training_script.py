@@ -1032,11 +1032,21 @@ if __name__ == "__main__":
     parser.add_argument("--resume-checkpoint", type=str, default=None, help="Prohibited resume checkpoint path")
     parser.add_argument("--checkpoint-to-resume", type=str, default=None, help="Prohibited checkpoint-to-resume path")
     args, unknown_args = parser.parse_known_args()
-    unknown_resume_flags = [
-        tok
-        for tok in unknown_args
-        if tok.startswith("--") and ("resume" in tok or "checkpoint" in tok)
+    unknown_resume_flags: List[str] = []
+    unknown_resume_indices = set()
+    for i, tok in enumerate(unknown_args):
+        if tok.startswith("--") and ("resume" in tok or "checkpoint" in tok):
+            unknown_resume_flags.append(tok)
+            unknown_resume_indices.add(i)
+            if i + 1 < len(unknown_args) and not unknown_args[i + 1].startswith("--"):
+                unknown_resume_indices.add(i + 1)
+
+    other_unknown = [
+        tok for i, tok in enumerate(unknown_args) if i not in unknown_resume_indices
     ]
+    if other_unknown:
+        raise RuntimeError(f"Unknown CLI argument(s): {' '.join(other_unknown)}")
+
     resume_request: Optional[str] = None
     if args.resume:
         resume_request = "--resume"

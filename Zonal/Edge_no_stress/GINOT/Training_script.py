@@ -860,12 +860,17 @@ def main(preset_name: str = "M", batch=8, dry_run: bool = False) -> None:
     )
 
     if resume_checkpoint is not None:
-        ckpt_model_family = resume_checkpoint.get("model_family")
-        if ckpt_model_family not in {None, "GINOT-A"}:
+        arch_identity = resume_checkpoint.get("arch") or {}
+        ckpt_model_family = resume_checkpoint.get("model_family", arch_identity.get("model_family"))
+        ckpt_model_class = resume_checkpoint.get("model_class", arch_identity.get("model_class"))
+        ckpt_model_config_identity = resume_checkpoint.get(
+            "model_config_identity",
+            arch_identity.get("model_config_identity"),
+        )
+        if ckpt_model_family != "GINOT-A":
             raise RuntimeError("Refusing to resume a checkpoint from another model family or ablation.")
-        ckpt_model_class = resume_checkpoint.get("model_class")
-        if ckpt_model_class not in {None, "GINOT_A"}:
-            raise RuntimeError("Refusing to resume a checkpoint from another model class.")
+        if ckpt_model_class != "GINOT_A" or ckpt_model_config_identity != "GINOT_A":
+            raise RuntimeError("Refusing to resume a checkpoint from another model class/config identity.")
         print(
             "Overwriting normalization stats with values from checkpoint to ensure consistency."
         )

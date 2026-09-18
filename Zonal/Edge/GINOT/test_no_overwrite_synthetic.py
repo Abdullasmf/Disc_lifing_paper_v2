@@ -21,7 +21,15 @@ def _load_guard(script_path: Path):
 
 def run_no_overwrite_smoke_test() -> None:
     repo_root = Path(__file__).resolve().parents[3]
-    training_scripts = sorted(repo_root.glob("**/GINOT/Training_script.py"))
+    script_patterns = [
+        "Zonal/Edge*/GINOT/Training_script.py",
+        "Uniform/Edge/GINOT/Training_script.py",
+    ]
+    training_scripts = sorted({
+        path
+        for pattern in script_patterns
+        for path in repo_root.glob(pattern)
+    })
     if not training_scripts:
         raise RuntimeError("No GINOT training scripts found for synthetic guard test.")
 
@@ -42,14 +50,16 @@ def run_no_overwrite_smoke_test() -> None:
                 assert str(ckpt_path) in msg
                 assert "overwrite and resume are prohibited" in msg
 
-        try:
-            guard("MATCH_250K", Path("/tmp/nonexistent.pt"), resume_request="--resume")
-            raise AssertionError(f"Expected RuntimeError for resume request in {script_path}")
-        except RuntimeError as exc:
-            msg = str(exc)
-            assert "GINOT-A" in msg
-            assert "MATCH_250K" in msg
-            assert "overwrite and resume are prohibited" in msg
+        with tempfile.TemporaryDirectory() as td:
+            resume_target = Path(td) / "resume_candidate.pt"
+            try:
+                guard("MATCH_250K", resume_target, resume_request="--resume")
+                raise AssertionError(f"Expected RuntimeError for resume request in {script_path}")
+            except RuntimeError as exc:
+                msg = str(exc)
+                assert "GINOT-A" in msg
+                assert "MATCH_250K" in msg
+                assert "overwrite and resume are prohibited" in msg
 
 
 if __name__ == "__main__":

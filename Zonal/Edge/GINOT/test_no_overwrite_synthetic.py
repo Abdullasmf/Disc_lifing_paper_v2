@@ -19,7 +19,7 @@ def _load_guard(script_path: Path):
     raise RuntimeError(f"No _prohibit_resume_or_overwrite guard found in {script_path}")
 
 
-def run_no_overwrite_smoke_test() -> None:
+def test_no_overwrite_smoke() -> None:
     repo_root = Path(__file__).resolve().parents[3]
     training_scripts = [
         repo_root / "Zonal/Edge/GINOT/Training_script.py",
@@ -60,5 +60,5 @@ def run_no_overwrite_smoke_test() -> None:
 
 
 if __name__ == "__main__":
-    run_no_overwrite_smoke_test()
+    test_no_overwrite_smoke()
     print("No-overwrite synthetic checks passed for all GINOT training scripts.")

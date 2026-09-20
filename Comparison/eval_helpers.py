@@ -65,7 +65,7 @@ class PublicationModelIdentity:
     from the raw internal id alone.
     """
 
-    architecture: Literal["GC-PointNet", "LC-PointNet", "ArGEnT-A"]
+    architecture: Literal["GC-PointNet", "LC-PointNet", "ArGEnT-A", "GINOT-A"]
     has_geometric_features: bool = False
     training_condition: Literal["standard", "weighted_loss"] = "standard"
     supervision: Literal["joint_stress_life", "life_only", "not_applicable"] = "not_applicable"
@@ -109,6 +109,8 @@ MODEL_IDENTITIES: Dict[str, PublicationModelIdentity] = {
     "PointNetMLPJoint_FP_headfeat": PublicationModelIdentity("LC-PointNet", has_geometric_features=True),
     "PointNetMLPJoint_weighted": PublicationModelIdentity("GC-PointNet", training_condition="weighted_loss"),
     "ArGEnT_self_att_noSDF": PublicationModelIdentity("ArGEnT-A"),
+    "GINOT-A": PublicationModelIdentity("GINOT-A"),
+    "GINOT_A": PublicationModelIdentity("GINOT-A"),
 }
 
 # Derived flat id -> label table, kept for readability at call sites that
@@ -125,6 +127,8 @@ DISPLAY_MODEL_ORDER: List[str] = [
     "LC-PointNet (weighted loss)",
     "ArGEnT-A",
     "ArGEnT-A + GF",
+    "GINOT-A",
+    "GINOT-A + GF",
 ]
 
 

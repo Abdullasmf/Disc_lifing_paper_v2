@@ -109,6 +109,7 @@ MODEL_IDENTITIES: Dict[str, PublicationModelIdentity] = {
     "PointNetMLPJoint_FP_headfeat": PublicationModelIdentity("LC-PointNet", has_geometric_features=True),
     "PointNetMLPJoint_weighted": PublicationModelIdentity("GC-PointNet", training_condition="weighted_loss"),
     "ArGEnT_self_att_noSDF": PublicationModelIdentity("ArGEnT-A"),
+    "GINOT": PublicationModelIdentity("GINOT-A"),
     "GINOT-A": PublicationModelIdentity("GINOT-A"),
     "GINOT_A": PublicationModelIdentity("GINOT-A"),
 }
@@ -140,6 +141,27 @@ class UnresolvedPublicationLabelError(ValueError):
     exact failure mode this module exists to prevent (see
     ``resolve_publication_label`` docstring).
     """
+
+
+def canonicalize_model_family(
+    model_family: Any,
+    *,
+    model_class: Optional[Any] = None,
+    model_config_identity: Optional[Any] = None,
+) -> str:
+    """Canonicalize verified legacy model identifiers used in checkpoints.
+
+    This keeps notebook result tables on a single internal identifier even when
+    older folder names or metadata aliases appear during discovery.
+    """
+    family = None if model_family is None else str(model_family)
+    model_class = None if model_class is None else str(model_class)
+    model_config_identity = None if model_config_identity is None else str(model_config_identity)
+    if family in {"GINOT", "GINOT-A", "GINOT_A"}:
+        return "GINOT-A"
+    if model_class == "GINOT_A" or model_config_identity == "GINOT_A":
+        return "GINOT-A"
+    return "" if family is None else family
 
 
 def resolve_publication_label(

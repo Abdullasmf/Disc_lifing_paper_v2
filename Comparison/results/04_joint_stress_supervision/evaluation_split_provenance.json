@@ -10014,8 +10014,8 @@
     4996,
     4997
   ],
-  "timestamp_utc": "2026-09-03T22:19:05Z",
-  "notebook_commit_sha": "80b67fdabeca50d66591b3feb1455bc3e1fb729b",
+  "timestamp_utc": "2026-09-21T20:40:56Z",
+  "notebook_commit_sha": "cfca80fc56caf8f51553030c6f394e8254175e73",
   "evaluation_label": "validation-split evaluation",
   "dataset_available": true,
   "independence_basis": "A deterministic geometry holdout is used, but checkpoint-selection independence is not proved."

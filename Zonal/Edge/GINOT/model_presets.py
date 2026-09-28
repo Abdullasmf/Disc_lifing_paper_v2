@@ -178,6 +178,27 @@ PRESETS: Dict[str, Dict[str, Any]] = {
             "dropout": 0.0,
         },
     ),
+    "MATCH_250K_FFM12": _compat_preset(
+        "MATCH_250K_FFM12",
+        {
+            "geom_coord_dim": 2,
+            "query_coord_dim": 2,
+            "geom_posenc_freqs": 12,
+            "query_posenc_freqs": 12,
+            "n_centroids": 128,
+            "n_neighbors": 16,
+            "local_mlp_widths": [72, 72],
+            "token_dim": 72,
+            "encoder_heads": 4,
+            "encoder_cross_attn_layers": 1,
+            "encoder_self_attn_layers": 1,
+            "decoder_cross_attn_layers": 1,
+            "decoder_heads": 4,
+            "decoder_mlp_widths": [144, 72],
+            "head_mlp_widths": [144, 72],
+            "dropout": 0.0,
+        },
+    ),
 }
 
 

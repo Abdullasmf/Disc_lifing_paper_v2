@@ -978,7 +978,7 @@ def main(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="GINOT-A training entrypoint")
-    parser.add_argument("--preset", type=str, default="M", help="Preset name (XS/S/M/L/XL/MATCH_250K/MATCH_250K_HIRES)")
+    parser.add_argument("--preset", type=str, default="MATCH_250K_FFM12", help="Preset name (XS/S/M/L/XL/MATCH_250K/MATCH_250K_HIRES)")
     parser.add_argument("--batch", type=int, default=8, help="Training batch size for batched_all mode")
     parser.add_argument("--dry-run", action="store_true", help="Instantiate model and print config without training")
     parser.add_argument("--resume", action="store_true", help="Prohibited resume flag for fail-fast guard")
